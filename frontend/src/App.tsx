@@ -366,7 +366,7 @@ function App() {
       {/* ─── Header ─────────────────────────────────────────────────────────── */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <CloudRain size={28} style={{ color: 'var(--accent-color)' }} />
+          <CloudRain size={28} style={{ color: 'var(--accent-color)' }} aria-hidden="true" />
           <div>
             <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
               RAIN<span style={{ color: 'var(--accent-color)' }}>READY</span>
@@ -426,7 +426,7 @@ function App() {
                       justifyContent: 'center',
                     }}
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={14} aria-hidden="true" />
                   </button>
                   {showDeleteConfirm && (
                     <DeleteConfirm
@@ -457,13 +457,13 @@ function App() {
               whiteSpace: 'nowrap',
             }}
           >
-            <PlusCircle size={13} />
+            <PlusCircle size={13} aria-hidden="true" />
             Add Household
           </button>
 
           {/* DB Status Badge */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-secondary)', padding: '6px 12px', borderRadius: '20px', border: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>
-            <Database size={11} style={{ color: dbStatus === 'connected' ? 'var(--success-color)' : 'var(--error-color)' }} />
+            <Database size={11} style={{ color: dbStatus === 'connected' ? 'var(--success-color)' : 'var(--error-color)' }} aria-hidden="true" />
             <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               {dbStatus === 'checking' ? 'Connecting...' : dbStatus === 'connected' ? 'DB Connected' : 'Offline Mode'}
             </span>
@@ -483,7 +483,7 @@ function App() {
                 className="btn-secondary"
                 style={{ alignSelf: 'flex-start', padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                <ArrowLeft size={14} /> Back to Dashboard
+                <ArrowLeft size={14} aria-hidden="true" /> Back to Dashboard
               </button>
             )}
             <PlanGenerator onSubmit={handleCreatePlan} loading={loading} />
@@ -503,7 +503,7 @@ function App() {
                     {plan.riskLevel} Risk
                   </div>
                 </div>
-                <AlertTriangle size={22} style={{ color: plan.riskLevel === 'high' ? 'var(--error-color)' : 'var(--warning-color)', flexShrink: 0 }} />
+                <AlertTriangle size={22} style={{ color: plan.riskLevel === 'high' ? 'var(--error-color)' : 'var(--warning-color)', flexShrink: 0 }} aria-hidden="true" />
               </div>
 
               <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -513,7 +513,7 @@ function App() {
                     {plan.location}
                   </div>
                 </div>
-                <Compass size={22} style={{ color: 'var(--accent-color)', flexShrink: 0 }} />
+                <Compass size={22} style={{ color: 'var(--accent-color)', flexShrink: 0 }} aria-hidden="true" />
               </div>
 
               {weather && (
@@ -525,7 +525,7 @@ function App() {
                     </div>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>Wind {weather.windspeed} km/h</div>
                   </div>
-                  <CloudRain size={22} style={{ color: 'var(--accent-color)', flexShrink: 0 }} />
+                  <CloudRain size={22} style={{ color: 'var(--accent-color)', flexShrink: 0 }} aria-hidden="true" />
                 </div>
               )}
 
@@ -537,7 +537,7 @@ function App() {
                   </div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>{checklistDone}/{checklistTotal} items stocked</div>
                 </div>
-                <ShieldCheck size={22} style={{ color: 'var(--success-color)', flexShrink: 0 }} />
+                <ShieldCheck size={22} style={{ color: 'var(--success-color)', flexShrink: 0 }} aria-hidden="true" />
               </div>
             </div>
 
