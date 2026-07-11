@@ -15,11 +15,20 @@ export interface ISafetyInstruction {
   details: string;
 }
 
+export interface IFamilyMember {
+  name: string;
+  age: number;
+  gender: string;
+  vulnerabilities: string[];
+}
+
 export interface IPreparednessPlan extends Document {
+  profileName: string;
   location: string;
   householdSize: number;
   buildingType: 'ground_floor' | 'high_rise' | 'independent';
   vulnerabilities: string[];
+  members: IFamilyMember[];
   riskLevel: 'low' | 'moderate' | 'high';
   checklist: IChecklistItem[];
   safetyInstructions: ISafetyInstruction[];
@@ -35,6 +44,13 @@ export interface ISafetyAlert extends Document {
   recommendations: string[];
   createdAt: Date;
 }
+
+const FamilyMemberSchema = new Schema<IFamilyMember>({
+  name: { type: String, required: true },
+  age: { type: Number, required: true },
+  gender: { type: String, required: true },
+  vulnerabilities: [{ type: String }]
+});
 
 const ChecklistItemSchema = new Schema<IChecklistItem>({
   id: { type: String, required: true },
@@ -52,10 +68,12 @@ const SafetyInstructionSchema = new Schema<ISafetyInstruction>({
 });
 
 const PreparednessPlanSchema = new Schema<IPreparednessPlan>({
+  profileName: { type: String, required: true },
   location: { type: String, required: true },
   householdSize: { type: Number, required: true },
   buildingType: { type: String, enum: ['ground_floor', 'high_rise', 'independent'], required: true },
   vulnerabilities: [{ type: String }],
+  members: [FamilyMemberSchema],
   riskLevel: { type: String, enum: ['low', 'moderate', 'high'], required: true },
   checklist: [ChecklistItemSchema],
   safetyInstructions: [SafetyInstructionSchema],

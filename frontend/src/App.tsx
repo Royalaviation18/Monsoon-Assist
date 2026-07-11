@@ -14,10 +14,12 @@ interface SafetyInstruction {
 
 interface PreparednessPlan {
   _id: string;
+  profileName: string;
   location: string;
   householdSize: number;
   buildingType: 'ground_floor' | 'high_rise' | 'independent';
   vulnerabilities: string[];
+  members: any[];
   riskLevel: 'low' | 'moderate' | 'high';
   checklist: any[];
   safetyInstructions: SafetyInstruction[];
@@ -38,6 +40,7 @@ const CITY_COORDS: Record<string, { lat: number; lon: number }> = {
 
 function App() {
   const [view, setView] = useState<'setup' | 'dashboard'>('setup');
+  const [plans, setPlans] = useState<PreparednessPlan[]>([]);
   const [plan, setPlan] = useState<PreparednessPlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [alerts, setAlerts] = useState<any[]>([]);
@@ -57,9 +60,10 @@ function App() {
     }
   }, [theme]);
 
-  // Verify health status and connection
+  // Verify health status, connection, and fetch existing plans
   useEffect(() => {
     checkHealth();
+    fetchPlans();
   }, []);
 
   const checkHealth = async () => {
@@ -73,6 +77,34 @@ function App() {
       }
     } catch {
       setDbStatus('disconnected');
+    }
+  };
+
+  const fetchPlans = async () => {
+    try {
+      const res = await fetch('/api/monsoon/plans');
+      if (res.ok) {
+        const data = await res.json();
+        setPlans(data);
+        if (data.length > 0) {
+          setPlan(data[0]);
+          setView('dashboard');
+          fetchAlerts(data[0].location);
+          fetchWeather(data[0].location);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load plans:', err);
+    }
+  };
+
+  const handleSelectPlan = (planId: string) => {
+    const selected = plans.find(p => p._id === planId);
+    if (selected) {
+      setPlan(selected);
+      setView('dashboard');
+      fetchAlerts(selected.location);
+      fetchWeather(selected.location);
     }
   };
 
@@ -112,6 +144,7 @@ function App() {
       });
       if (res.ok) {
         const data = await res.json();
+        setPlans(prev => [data, ...prev]);
         setPlan(data);
         setView('dashboard');
         confetti(); // Celebratory effect on plan creation success
@@ -175,6 +208,52 @@ function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Family Profiles Dropdown */}
+          {plans.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-tertiary)' }}>ACTIVE FAMILY:</span>
+              <select
+                value={plan?._id || ''}
+                onChange={(e) => handleSelectPlan(e.target.value)}
+                style={{
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  padding: '5px 10px',
+                  borderRadius: '20px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  width: 'auto',
+                  cursor: 'pointer'
+                }}
+              >
+                {plans.map(p => (
+                  <option key={p._id} value={p._id}>{p.profileName} ({p.location})</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* New Profile button */}
+          <button
+            onClick={() => setView('setup')}
+            style={{
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--accent-color)',
+              padding: '6px 12px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            + Add Household
+          </button>
+
           {/* Theme switcher */}
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}

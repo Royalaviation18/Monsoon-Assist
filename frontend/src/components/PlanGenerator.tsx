@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldAlert, Users, Home, ChevronRight, Check, MapPin } from 'lucide-react';
+import { ShieldAlert, Home, ChevronRight, MapPin } from 'lucide-react';
+
+const LANGUAGES = ['English', 'Hindi', 'Bengali', 'Tamil', 'Telugu', 'Marathi'];
 
 interface PlanGeneratorProps {
   onSubmit: (data: any) => void;
@@ -7,12 +9,22 @@ interface PlanGeneratorProps {
 }
 
 export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading }) => {
+  const [profileName, setProfileName] = useState('My Home');
   const [location, setLocation] = useState('Mumbai');
-  const [householdSize, setHouseholdSize] = useState(3);
   const [buildingType, setBuildingType] = useState<'ground_floor' | 'high_rise' | 'independent'>('ground_floor');
-  const [vulnerabilities, setVulnerabilities] = useState<string[]>([]);
   const [language, setLanguage] = useState('English');
   const [detecting, setDetecting] = useState(false);
+
+  // Dynamic Family Members List
+  const [members, setMembers] = useState<Array<{ name: string; age: number; gender: string; vulnerabilities: string[] }>>([
+    { name: 'Self', age: 28, gender: 'Male', vulnerabilities: [] }
+  ]);
+
+  // Member Input States
+  const [mName, setMName] = useState('');
+  const [mAge, setMAge] = useState(30);
+  const [mGender, setMGender] = useState('Male');
+  const [mVuln, setMVuln] = useState<string[]>([]);
 
   // Auto-detect location on load
   useEffect(() => {
@@ -35,28 +47,39 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
     fetchGeoLocation();
   }, []);
 
-  const COMMON_VULNERABILITIES = [
-    { id: 'elderly', label: 'Elderly Relatives (65+)' },
-    { id: 'infants', label: 'Infants or Young Kids' },
-    { id: 'pets', label: 'Household Pets' },
-    { id: 'medical_needs', label: 'Special Medical Needs' }
-  ];
+  const addMember = () => {
+    if (!mName.trim()) return;
+    setMembers(prev => [...prev, {
+      name: mName.trim(),
+      age: mAge,
+      gender: mGender,
+      vulnerabilities: mVuln
+    }]);
+    setMName('');
+    setMAge(30);
+    setMGender('Male');
+    setMVuln([]);
+  };
 
-  const LANGUAGES = ['English', 'Hindi', 'Bengali', 'Tamil', 'Telugu', 'Marathi'];
+  const removeMember = (index: number) => {
+    setMembers(prev => prev.filter((_, i) => i !== index));
+  };
 
-  const toggleVulnerability = (id: string) => {
-    setVulnerabilities(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+  const toggleMemberVuln = (v: string) => {
+    setMVuln(prev =>
+      prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v]
     );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit({
+      profileName,
       location,
-      householdSize,
+      householdSize: members.length,
       buildingType,
-      vulnerabilities,
+      vulnerabilities: Array.from(new Set(members.flatMap(m => m.vulnerabilities))),
+      members,
       language
     });
   };
@@ -74,10 +97,24 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        {/* Profile Name */}
+        <div>
+          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+            HOUSEHOLD PROFILE NAME
+          </label>
+          <input
+            type="text"
+            value={profileName}
+            onChange={(e) => setProfileName(e.target.value)}
+            placeholder="e.g. My Flat, Grandfather's House"
+            required
+          />
+        </div>
+
         {/* Location */}
         <div>
           <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-            <span>YOUR REGION / CITY</span>
+            <span>LOCATION / CITY</span>
             {detecting && <span style={{ fontSize: '0.75rem', color: 'var(--accent-color)', fontWeight: 500 }}>Detecting...</span>}
           </label>
           <div style={{ position: 'relative' }}>
@@ -85,32 +122,11 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
               type="text"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              placeholder="e.g. Mumbai, Kerala, Assam"
+              placeholder="e.g. Mumbai, Bokaro"
               style={{ paddingLeft: '34px' }}
               required
             />
             <MapPin size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
-          </div>
-        </div>
-
-        {/* Household Size */}
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              HOUSEHOLD MEMBERS
-            </label>
-            <span style={{ fontWeight: 600, color: 'var(--accent-color)' }}>{householdSize} People</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Users size={18} style={{ color: 'var(--text-tertiary)' }} />
-            <input
-              type="range"
-              min={1}
-              max={15}
-              value={householdSize}
-              onChange={(e) => setHouseholdSize(Number(e.target.value))}
-              style={{ padding: 0 }}
-            />
           </div>
         </div>
       </div>
@@ -163,40 +179,141 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
         </div>
       </div>
 
-      {/* Vulnerabilities Grid */}
-      <div>
-        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '10px' }}>
-          HOUSEHOLD VULNERABILITIES
-        </label>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
-          {COMMON_VULNERABILITIES.map((vuln) => {
-            const selected = vulnerabilities.includes(vuln.id);
-            return (
+      {/* Family Directory Header */}
+      <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
+          Family Directory ({members.length} members)
+        </h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+          Add details of the family members living in this household to customize emergency checklist quotas.
+        </p>
+      </div>
+
+      {/* Current Members Grid */}
+      {members.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
+          {members.map((m, idx) => (
+            <div
+              key={idx}
+              style={{
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '8px',
+                padding: '12px',
+                position: 'relative'
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>{m.name}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                {m.gender}, {m.age} years old
+              </div>
+              {m.vulnerabilities.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                  {m.vulnerabilities.map(v => (
+                    <span key={v} style={{ fontSize: '0.65rem', background: 'rgba(244, 63, 94, 0.1)', border: '1px solid rgba(244, 63, 94, 0.2)', color: 'var(--error-color)', padding: '1px 5px', borderRadius: '4px' }}>
+                      {v === 'mobility' ? 'Mobility Support' : v === 'infant' ? 'Infant' : v === 'medical' ? 'Medical Support' : v}
+                    </span>
+                  ))}
+                </div>
+              )}
               <button
                 type="button"
-                key={vuln.id}
-                onClick={() => toggleVulnerability(vuln.id)}
+                onClick={() => removeMember(idx)}
                 style={{
-                  background: selected ? 'rgba(255, 255, 255, 0.04)' : 'transparent',
-                  border: selected ? '1px solid var(--text-secondary)' : '1px solid var(--border-color)',
-                  color: selected ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  borderRadius: '8px',
-                  padding: '10px 14px',
-                  fontSize: '0.85rem',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
+                  position: 'absolute',
+                  top: '8px',
+                  right: '8px',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--error-color)',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer'
                 }}
               >
-                {vuln.label}
-                {selected && <Check size={14} style={{ color: 'var(--accent-color)' }} />}
+                ✕
               </button>
-            );
-          })}
+            </div>
+          ))}
         </div>
+      )}
+
+      {/* Add Member Subform */}
+      <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '16px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)' }}>ADD FAMILY MEMBER</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>NAME</label>
+            <input
+              type="text"
+              value={mName}
+              onChange={(e) => setMName(e.target.value)}
+              placeholder="e.g. Grandfather, Sister"
+              style={{ padding: '8px 10px', fontSize: '0.85rem' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>AGE</label>
+            <input
+              type="number"
+              value={mAge}
+              onChange={(e) => setMAge(Number(e.target.value))}
+              style={{ padding: '8px 10px', fontSize: '0.85rem' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>GENDER</label>
+            <select
+              value={mGender}
+              onChange={(e) => setMGender(e.target.value)}
+              style={{ padding: '8px 10px', fontSize: '0.85rem' }}
+            >
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Member Vulnerability checklist */}
+        <div>
+          <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>SPECIAL ASSISTANCE NEEDS</label>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {[
+              { id: 'mobility', label: 'Mobility Support' },
+              { id: 'infant', label: 'Infant / Child care' },
+              { id: 'medical', label: 'Chronic Medical Needs' }
+            ].map(v => {
+              const selected = mVuln.includes(v.id);
+              return (
+                <button
+                  type="button"
+                  key={v.id}
+                  onClick={() => toggleMemberVuln(v.id)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                    border: selected ? '1px solid var(--error-color)' : '1px solid var(--border-color)',
+                    background: selected ? 'rgba(244, 63, 94, 0.05)' : 'transparent',
+                    color: selected ? 'var(--error-color)' : 'var(--text-secondary)'
+                  }}
+                >
+                  {v.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={addMember}
+          className="btn-secondary"
+          style={{ padding: '8px 12px', fontSize: '0.8rem', alignSelf: 'flex-start' }}
+        >
+          + Add Member to Directory
+        </button>
       </div>
 
       {/* Language Preference */}

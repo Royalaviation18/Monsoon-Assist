@@ -45,6 +45,7 @@ export class AIService {
     householdSize: number,
     buildingType: 'ground_floor' | 'high_rise' | 'independent',
     vulnerabilities: string[],
+    members: any[],
     language: string = 'English'
   ) {
     // Determine risk heuristically first for fallbacks
@@ -61,6 +62,7 @@ export class AIService {
         householdSize,
         buildingType,
         vulnerabilities,
+        members,
         riskLevel,
         checklist: fallback.checklist,
         safetyInstructions: fallback.safetyInstructions,
@@ -75,9 +77,9 @@ You are a senior crisis management and disaster safety expert specialized in Ind
 
 Generate a highly personalized Monsoon Preparedness Plan for:
 - Location: ${location}
-- Household Size: ${householdSize} members
-- Building Type: ${buildingType} (${buildingType === 'ground_floor' ? 'High risk of water ingress/flooding' : buildingType === 'high_rise' ? 'Risk of wind damage, power cuts, lift shutdowns' : 'Risk of roof leakage, yard logging'})
-- Vulnerable Members: ${vulnerabilities.join(', ') || 'None'}
+- Building Type: ${buildingType}
+- Family Directory Details:
+${JSON.stringify(members, null, 2)}
 - Preferred Output Language: ${language}
 
 Your response must be a single, valid JSON object (no markdown backticks, no code blocks, just raw JSON). Use this exact schema structure:
@@ -91,7 +93,7 @@ Your response must be a single, valid JSON object (no markdown backticks, no cod
   ]
 }
 
-Ensure the instructions and checklist are fully translated into ${language} if requested. Adjust quantities dynamically: if householdSize is ${householdSize}, ensure checklist quantities (e.g. food, water liters) match this size.
+Adjust quantities dynamically: base checklist quantities on the household members listed. Provide custom safety guidelines in safetyInstructions matching specific member profiles (e.g. if there is a senior citizen or infant, specify custom medical or evacuation tasks). Ensure the instructions and checklist are fully translated into ${language} if requested.
 `;
 
       const result = await model.generateContent(prompt);
@@ -106,6 +108,7 @@ Ensure the instructions and checklist are fully translated into ${language} if r
         householdSize,
         buildingType,
         vulnerabilities,
+        members,
         riskLevel,
         checklist: fallback.checklist,
         safetyInstructions: fallback.safetyInstructions,

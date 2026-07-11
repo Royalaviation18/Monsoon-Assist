@@ -7,10 +7,17 @@ const router = Router();
 
 // Zod schemas for input validation
 const CreatePlanSchema = z.object({
+  profileName: z.string().min(2, 'Profile name is required'),
   location: z.string().min(2, 'Location is required'),
   householdSize: z.number().min(1, 'Household size must be at least 1'),
   buildingType: z.enum(['ground_floor', 'high_rise', 'independent']),
   vulnerabilities: z.array(z.string()),
+  members: z.array(z.object({
+    name: z.string(),
+    age: z.number(),
+    gender: z.string(),
+    vulnerabilities: z.array(z.string())
+  })).default([]),
   language: z.string().default('English')
 });
 
@@ -48,7 +55,7 @@ const validate = (schema: z.ZodSchema) => (req: Request, res: Response, next: Ne
 // Endpoints
 router.post('/plan', validate(CreatePlanSchema), async (req: Request, res: Response) => {
   try {
-    const { location, householdSize, buildingType, vulnerabilities, language } = req.body;
+    const { profileName, location, householdSize, buildingType, vulnerabilities, members, language } = req.body;
     
     // Call Gemini AI
     const rawPlan = await AIService.generatePreparednessPlan(
@@ -56,15 +63,18 @@ router.post('/plan', validate(CreatePlanSchema), async (req: Request, res: Respo
       householdSize,
       buildingType,
       vulnerabilities,
+      members,
       language
     );
 
     // Save plan to MongoDB
     const plan = new PreparednessPlan({
+      profileName,
       location,
       householdSize,
       buildingType,
       vulnerabilities,
+      members,
       riskLevel: rawPlan.riskLevel,
       checklist: rawPlan.checklist,
       safetyInstructions: rawPlan.safetyInstructions,
