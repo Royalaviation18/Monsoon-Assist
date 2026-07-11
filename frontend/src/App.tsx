@@ -25,6 +25,17 @@ interface PreparednessPlan {
   createdAt: string;
 }
 
+const CITY_COORDS: Record<string, { lat: number; lon: number }> = {
+  mumbai: { lat: 19.0760, lon: 72.8777 },
+  pune: { lat: 18.5204, lon: 73.8567 },
+  bengaluru: { lat: 12.9716, lon: 77.5946 },
+  bangalore: { lat: 12.9716, lon: 77.5946 },
+  delhi: { lat: 28.7041, lon: 77.1025 },
+  kolkata: { lat: 22.5726, lon: 88.3639 },
+  chennai: { lat: 13.0827, lon: 80.2707 },
+  kerala: { lat: 10.8505, lon: 76.2711 }
+};
+
 function App() {
   const [view, setView] = useState<'setup' | 'dashboard'>('setup');
   const [plan, setPlan] = useState<PreparednessPlan | null>(null);
@@ -32,6 +43,19 @@ function App() {
   const [alerts, setAlerts] = useState<any[]>([]);
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const [activeTab, setActiveTab] = useState<'instructions' | 'checklist' | 'travel' | 'chat'>('instructions');
+  
+  // Theme & Weather States
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [weather, setWeather] = useState<{ temp: number; windspeed: number; condition: string } | null>(null);
+
+  // Toggle Theme class
+  useEffect(() => {
+    if (theme === 'light') {
+      document.documentElement.classList.add('light-theme');
+    } else {
+      document.documentElement.classList.remove('light-theme');
+    }
+  }, [theme]);
 
   // Verify health status and connection
   useEffect(() => {
@@ -52,6 +76,32 @@ function App() {
     }
   };
 
+  const fetchWeather = async (locStr: string) => {
+    const key = locStr.toLowerCase().trim();
+    let coords = CITY_COORDS[key];
+    
+    // Fallback search
+    if (!coords) {
+      const matchingKey = Object.keys(CITY_COORDS).find(k => key.includes(k));
+      coords = matchingKey ? CITY_COORDS[matchingKey] : CITY_COORDS['mumbai'];
+    }
+
+    try {
+      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current_weather=true`);
+      if (res.ok) {
+        const data = await res.json();
+        const cur = data.current_weather;
+        setWeather({
+          temp: cur.temperature,
+          windspeed: cur.windspeed,
+          condition: cur.weathercode >= 51 ? 'Heavy Rain' : 'Light Drizzle / Cloudy'
+        });
+      }
+    } catch (err) {
+      console.warn('Weather API failed:', err);
+    }
+  };
+
   const handleCreatePlan = async (formData: any) => {
     setLoading(true);
     try {
@@ -66,8 +116,9 @@ function App() {
         setView('dashboard');
         confetti(); // Celebratory effect on plan creation success
         
-        // Fetch matching location alerts
+        // Fetch alerts & live weather
         fetchAlerts(formData.location);
+        fetchWeather(formData.location);
       }
     } catch (err) {
       console.error('Plan creation failed:', err);
@@ -123,12 +174,34 @@ function App() {
           </div>
         </div>
 
-        {/* Database Health Badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-secondary)', padding: '6px 12px', borderRadius: '20px', border: '1px solid var(--border-color)' }}>
-          <Database size={12} style={{ color: dbStatus === 'connected' ? 'var(--success-color)' : 'var(--error-color)' }} />
-          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-            DB: {dbStatus === 'checking' ? 'Connecting...' : dbStatus === 'connected' ? 'Atlas Connected' : 'Offline Mode'}
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Theme switcher */}
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            style={{
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-secondary)',
+              padding: '6px 12px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            {theme === 'dark' ? '☀ Light Mode' : '🌙 Dark Mode'}
+          </button>
+          
+          {/* Database Health Badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-secondary)', padding: '6px 12px', borderRadius: '20px', border: '1px solid var(--border-color)' }}>
+            <Database size={12} style={{ color: dbStatus === 'connected' ? 'var(--success-color)' : 'var(--error-color)' }} />
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              DB: {dbStatus === 'checking' ? 'Connecting...' : dbStatus === 'connected' ? 'Atlas Connected' : 'Offline Mode'}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -145,7 +218,7 @@ function App() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', animation: 'fadeIn 0.2s ease-out' }}>
             
             {/* Top Stats Overview */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
               <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>MONSOON RISK LEVEL</div>
@@ -166,9 +239,21 @@ function App() {
                 <Compass size={24} style={{ color: 'var(--accent-color)' }} />
               </div>
 
+              {weather && (
+                <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>LIVE WEATHER</div>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 850, color: 'var(--text-primary)', marginTop: '2px' }}>
+                      {weather.temp}°C • {weather.condition}
+                    </div>
+                  </div>
+                  <CloudRain size={24} style={{ color: 'var(--accent-color)' }} />
+                </div>
+              )}
+
               <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>SUPPLIES READY STATUS</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>SUPPLIES READY</div>
                   <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--success-color)', marginTop: '2px' }}>
                     {Math.round((plan.checklist.filter(x => x.completed).length / plan.checklist.length) * 100)}%
                   </div>

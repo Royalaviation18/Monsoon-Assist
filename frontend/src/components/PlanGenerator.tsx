@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ShieldAlert, Users, Home, ChevronRight, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShieldAlert, Users, Home, ChevronRight, Check, MapPin } from 'lucide-react';
 
 interface PlanGeneratorProps {
   onSubmit: (data: any) => void;
@@ -12,6 +12,28 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
   const [buildingType, setBuildingType] = useState<'ground_floor' | 'high_rise' | 'independent'>('ground_floor');
   const [vulnerabilities, setVulnerabilities] = useState<string[]>([]);
   const [language, setLanguage] = useState('English');
+  const [detecting, setDetecting] = useState(false);
+
+  // Auto-detect location on load
+  useEffect(() => {
+    const fetchGeoLocation = async () => {
+      setDetecting(true);
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.city) {
+            setLocation(data.city);
+          }
+        }
+      } catch (err) {
+        console.warn('Geolocation auto-detect failed, using default.', err);
+      } finally {
+        setDetecting(false);
+      }
+    };
+    fetchGeoLocation();
+  }, []);
 
   const COMMON_VULNERABILITIES = [
     { id: 'elderly', label: 'Elderly Relatives (65+)' },
@@ -54,16 +76,21 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
         {/* Location */}
         <div>
-          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-            YOUR REGION / CITY
+          <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+            <span>YOUR REGION / CITY</span>
+            {detecting && <span style={{ fontSize: '0.75rem', color: 'var(--accent-color)', fontWeight: 500 }}>Detecting...</span>}
           </label>
-          <input
-            type="text"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="e.g. Mumbai, Kerala, Assam"
-            required
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g. Mumbai, Kerala, Assam"
+              style={{ paddingLeft: '34px' }}
+              required
+            />
+            <MapPin size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
+          </div>
         </div>
 
         {/* Household Size */}
