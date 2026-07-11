@@ -1,10 +1,10 @@
+import dotenv from 'dotenv';
+dotenv.config(); // Must be called first to populate process.env
+
 import express, { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import assistantRouter from './routes/assistant.routes';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
