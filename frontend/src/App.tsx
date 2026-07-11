@@ -228,7 +228,7 @@ function App() {
                 }}
               >
                 {plans.map(p => (
-                  <option key={p._id} value={p._id}>{p.profileName} ({p.location})</option>
+                  <option key={p._id} value={p._id}>{p.profileName || 'Household'} ({p.location})</option>
                 ))}
               </select>
             </div>
