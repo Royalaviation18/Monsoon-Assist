@@ -3,6 +3,17 @@ import { ShieldAlert, Home, ChevronRight, MapPin } from 'lucide-react';
 
 const LANGUAGES = ['English', 'Hindi', 'Bengali', 'Tamil', 'Telugu', 'Marathi'];
 
+const CITY_COORDS: Record<string, { lat: number; lon: number }> = {
+  mumbai: { lat: 19.0760, lon: 72.8777 },
+  pune: { lat: 18.5204, lon: 73.8567 },
+  bengaluru: { lat: 12.9716, lon: 77.5946 },
+  bangalore: { lat: 12.9716, lon: 77.5946 },
+  delhi: { lat: 28.7041, lon: 77.1025 },
+  kolkata: { lat: 22.5726, lon: 88.3639 },
+  chennai: { lat: 13.0827, lon: 80.2707 },
+  kerala: { lat: 10.8505, lon: 76.2711 }
+};
+
 interface PlanGeneratorProps {
   onSubmit: (data: any) => void;
   loading: boolean;
@@ -14,6 +25,7 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
   const [buildingType, setBuildingType] = useState<'ground_floor' | 'high_rise' | 'independent'>('ground_floor');
   const [language, setLanguage] = useState('English');
   const [detecting, setDetecting] = useState(false);
+  const [localWeather, setLocalWeather] = useState<{ temp: number; condition: string } | null>(null);
 
   // Dynamic Family Members List
   const [members, setMembers] = useState<Array<{ name: string; age: number; gender: string; vulnerabilities: string[] }>>([
@@ -51,6 +63,34 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
     };
     fetchGeoLocation();
   }, []);
+
+  // Fetch local weather when location changes
+  useEffect(() => {
+    const fetchLocalWeather = async () => {
+      const key = location.toLowerCase().trim();
+      if (key.length < 2) return;
+      
+      let coords = CITY_COORDS[key];
+      if (!coords) {
+        const matchingKey = Object.keys(CITY_COORDS).find(k => key.includes(k));
+        coords = matchingKey ? CITY_COORDS[matchingKey] : CITY_COORDS['mumbai'];
+      }
+      try {
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current_weather=true`);
+        if (res.ok) {
+          const data = await res.json();
+          const cur = data.current_weather;
+          setLocalWeather({
+            temp: cur.temperature,
+            condition: cur.weathercode >= 51 ? 'Heavy Rain' : 'Light Drizzle / Cloudy'
+          });
+        }
+      } catch (err) {
+        console.warn('Home page weather fetch failed:', err);
+      }
+    };
+    fetchLocalWeather();
+  }, [location]);
 
   const addMember = () => {
     if (!mName.trim()) return;
@@ -102,6 +142,27 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
           Configure household details to let Generative AI structure safety instructions and custom survival supplies.
         </p>
       </div>
+
+      {localWeather && (
+        <div style={{
+          background: 'rgba(16, 185, 129, 0.04)',
+          border: '1px solid rgba(16, 185, 129, 0.15)',
+          borderRadius: '8px',
+          padding: '12px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: 700, letterSpacing: '0.05em' }}>LIVE MONSOON WEATHER FOR {location.toUpperCase()}</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>
+              {localWeather.temp}°C • {localWeather.condition}
+            </div>
+          </div>
+          <MapPin size={20} style={{ color: 'var(--accent-color)' }} />
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
         {/* Profile Name */}
