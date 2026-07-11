@@ -532,7 +532,7 @@ function App() {
 
             {/* Stats Row */}
             <div style={STATS_GRID_STYLE}>
-              <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="glass-card" style={STAT_CARD_STYLE}>
                 <div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.04em' }}>MONSOON RISK LEVEL</div>
                   <div style={{ fontSize: '1.4rem', fontWeight: 800, color: plan.riskLevel === 'high' ? 'var(--error-color)' : plan.riskLevel === 'moderate' ? 'var(--warning-color)' : 'var(--success-color)', textTransform: 'uppercase', marginTop: '2px' }}>
@@ -542,7 +542,7 @@ function App() {
                 <AlertTriangle size={22} style={{ color: plan.riskLevel === 'high' ? 'var(--error-color)' : 'var(--warning-color)', flexShrink: 0 }} aria-hidden="true" />
               </div>
 
-              <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="glass-card" style={STAT_CARD_STYLE}>
                 <div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.04em' }}>LOCATION PREPARED</div>
                   <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
@@ -553,7 +553,7 @@ function App() {
               </div>
 
               {weather && (
-                <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="glass-card" style={STAT_CARD_STYLE}>
                   <div>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.04em' }}>LIVE WEATHER</div>
                     <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>
@@ -565,7 +565,7 @@ function App() {
                 </div>
               )}
 
-              <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="glass-card" style={STAT_CARD_STYLE}>
                 <div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.04em' }}>SUPPLIES READY</div>
                   <div style={{ fontSize: '1.4rem', fontWeight: 800, color: completionPct === 100 ? 'var(--success-color)' : 'var(--text-primary)', marginTop: '2px' }}>
@@ -807,7 +807,7 @@ function App() {
       </main>
 
       {/* ─── Footer ──────────────────────────────────────────────────────────── */}
-      <footer style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-tertiary)', letterSpacing: '0.02em' }}>
+      <footer style={FOOTER_STYLE}>
         © 2026 RainReady — AI-Powered Monsoon Safety Companion. Designed for citizen safety and disaster risk reduction.
       </footer>
     </div>
