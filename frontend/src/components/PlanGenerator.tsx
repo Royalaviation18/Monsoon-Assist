@@ -46,6 +46,13 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
   // Auto-detect location on load
   useEffect(() => {
     const fetchGeoLocation = async () => {
+      // Check cache first
+      const cached = sessionStorage.getItem('detected_city');
+      if (cached) {
+        setLocation(cached);
+        return;
+      }
+
       setDetecting(true);
       try {
         const res = await fetch('https://ipapi.co/json/');
@@ -53,6 +60,7 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
           const data = await res.json();
           if (data.city) {
             setLocation(data.city);
+            sessionStorage.setItem('detected_city', data.city);
           }
         }
       } catch (err) {

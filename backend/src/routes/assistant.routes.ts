@@ -159,4 +159,15 @@ router.get('/alerts/:location', async (req: Request, res: Response) => {
   }
 });
 
+// Delete a plan profile
+router.delete('/plan/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await PreparednessPlan.findByIdAndDelete(id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete plan' });
+  }
+});
+
 export default router;

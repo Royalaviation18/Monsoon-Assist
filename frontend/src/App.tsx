@@ -108,6 +108,29 @@ function App() {
     }
   };
 
+  const handleDeletePlan = async (planId: string) => {
+    if (!confirm("Are you sure you want to delete this household profile?")) return;
+    try {
+      const res = await fetch(`/api/monsoon/plan/${planId}`, { method: 'DELETE' });
+      if (res.ok) {
+        const updated = plans.filter(p => p._id !== planId);
+        setPlans(updated);
+        if (updated.length > 0) {
+          setPlan(updated[0]);
+          setView('dashboard');
+          fetchAlerts(updated[0].location);
+          fetchWeather(updated[0].location);
+        } else {
+          setPlan(null);
+          setView('setup');
+          setWeather(null);
+        }
+      }
+    } catch (err) {
+      console.error('Delete failed:', err);
+    }
+  };
+
   const fetchWeather = async (locStr: string) => {
     const key = locStr.toLowerCase().trim();
     let coords = CITY_COORDS[key];
@@ -231,6 +254,24 @@ function App() {
                   <option key={p._id} value={p._id}>{p.profileName || 'Household'} ({p.location})</option>
                 ))}
               </select>
+              {plan && (
+                <button
+                  onClick={() => handleDeletePlan(plan._id)}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--error-color)',
+                    padding: '5px 10px',
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                    fontWeight: 600
+                  }}
+                  title="Delete active household profile"
+                >
+                  ✕ Delete
+                </button>
+              )}
             </div>
           )}
 
