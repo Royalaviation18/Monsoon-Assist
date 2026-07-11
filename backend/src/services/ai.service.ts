@@ -1,11 +1,33 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Initialize the Gemini API client
+// ─── Init ─────────────────────────────────────────────────────────────────────
 const apiKey = process.env.GEMINI_API_KEY || '';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash-latest';
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
-// Minimalist fallback databases to keep code production-safe and functional offline
-const FALLBACK_PLANS: Record<string, any> = {
+if (!apiKey) {
+  console.warn('[RainReady] GEMINI_API_KEY not set. AI features will use offline fallbacks.');
+}
+
+// ─── Safe JSON Parse ──────────────────────────────────────────────────────────
+/**
+ * Safely parse Gemini's text response as JSON.
+ * Strips markdown code fences if present. Returns null on failure.
+ */
+const safeJsonParse = <T>(text: string): T | null => {
+  try {
+    const cleaned = text
+      .replace(/```json\s*/gi, '')
+      .replace(/```\s*/g, '')
+      .trim();
+    return JSON.parse(cleaned) as T;
+  } catch {
+    return null;
+  }
+};
+
+// ─── Fallback Databases ───────────────────────────────────────────────────────
+const FALLBACK_PLANS: Record<'high' | 'moderate' | 'low', any> = {
   high: {
     riskLevel: 'high',
     checklist: [
@@ -13,12 +35,16 @@ const FALLBACK_PLANS: Record<string, any> = {
       { id: 'c2', item: 'Waterproof First-Aid & Emergency Meds', category: 'Medical', quantity: '0', requiredQuantity: '1 kit', completed: false },
       { id: 'c3', item: 'Fully charged 20000mAh Power Banks', category: 'Power', quantity: '0', requiredQuantity: '2 units', completed: false },
       { id: 'c4', item: 'Dry food (biscuits, dry fruits, roasted chana)', category: 'Survival', quantity: '0', requiredQuantity: '3 days', completed: false },
-      { id: 'c5', item: 'Heavy-duty flashlight and spare cells', category: 'Safety', quantity: '0', requiredQuantity: '2 units', completed: false }
+      { id: 'c5', item: 'Heavy-duty flashlight and spare batteries', category: 'Safety', quantity: '0', requiredQuantity: '2 units', completed: false },
+      { id: 'c6', item: 'Important documents in waterproof pouch', category: 'Documents', quantity: '0', requiredQuantity: '1 set', completed: false },
     ],
     safetyInstructions: [
       { phase: 'before', action: 'Elevate all electrical items', details: 'Move appliances at least 3 feet off the ground to prevent waterlogging shorts.' },
+      { phase: 'before', action: 'Seal door gaps', details: 'Use sandbags or waterproofing tape around exterior doors and low windows.' },
       { phase: 'during', action: 'Turn off the main power line', details: 'Shut down mains if water enters the house to avoid electrocution.' },
-      { phase: 'after', action: 'Sanitize standing water spots', details: 'Clean up residues and use disinfectant to prevent dengue/malaria breeding.' }
+      { phase: 'during', action: 'Stay on upper floors', details: 'If ground floor floods, move to upper floors and signal rescuers from windows.' },
+      { phase: 'after', action: 'Sanitize standing water spots', details: 'Clean up residues and use disinfectant to prevent dengue/malaria breeding.' },
+      { phase: 'after', action: 'Do not drink tap water', details: 'After flooding, treat all tap water as contaminated. Use stored bottled water only.' },
     ]
   },
   moderate: {
@@ -26,19 +52,46 @@ const FALLBACK_PLANS: Record<string, any> = {
     checklist: [
       { id: 'c1', item: 'Drinking Water bottles', category: 'Survival', quantity: '0', requiredQuantity: '10L', completed: false },
       { id: 'c2', item: 'Basic First-Aid kit', category: 'Medical', quantity: '0', requiredQuantity: '1 kit', completed: false },
-      { id: 'c3', item: 'Power bank & dry food', category: 'Survival', quantity: '0', requiredQuantity: '1 pack', completed: false }
+      { id: 'c3', item: 'Power bank & dry food', category: 'Survival', quantity: '0', requiredQuantity: '1 pack', completed: false },
+      { id: 'c4', item: 'Raincoat and rubber boots', category: 'Safety', quantity: '0', requiredQuantity: '1 set per person', completed: false },
     ],
     safetyInstructions: [
       { phase: 'before', action: 'Inspect roof and gutters', details: 'Clear dry leaves and seal visible cracks to prevent ceiling leaks.' },
       { phase: 'during', action: 'Stay indoors during heavy downpours', details: 'Avoid parking under weak structures or trees.' },
-      { phase: 'after', action: 'Check vehicle tires and brakes', details: 'Ensure proper grip before driving on slick tarmac.' }
+      { phase: 'after', action: 'Check vehicle tires and brakes', details: 'Ensure proper grip before driving on slick tarmac.' },
+    ]
+  },
+  low: {
+    riskLevel: 'low',
+    checklist: [
+      { id: 'c1', item: 'Umbrella and raincoat', category: 'Safety', quantity: '0', requiredQuantity: '1 per person', completed: false },
+      { id: 'c2', item: 'Basic First-Aid kit', category: 'Medical', quantity: '0', requiredQuantity: '1 kit', completed: false },
+    ],
+    safetyInstructions: [
+      { phase: 'before', action: 'Standard monsoon prep', details: 'Check drainage around your home and secure outdoor furniture.' },
+      { phase: 'during', action: 'Drive carefully', details: 'Reduced visibility and wet roads require slower speeds.' },
+      { phase: 'after', action: 'Check for dampness', details: 'Inspect walls and ceiling for seepage after heavy rains.' },
     ]
   }
 };
 
+// ─── Risk Heuristic ───────────────────────────────────────────────────────────
+const HIGH_RISK_ZONES = ['mumbai', 'chennai', 'kolkata', 'patna', 'assam', 'kerala', 'bengaluru', 'bhubaneswar', 'hyderabad', 'guwahati'];
+
+const getRiskLevel = (location: string, buildingType: string): 'high' | 'moderate' | 'low' => {
+  const loc = location.toLowerCase();
+  const isFloodZone = HIGH_RISK_ZONES.some(c => loc.includes(c));
+  if (isFloodZone || buildingType === 'ground_floor') return 'high';
+  if (buildingType === 'high_rise') return 'moderate';
+  return 'moderate';
+};
+
+// ─── AI Service ───────────────────────────────────────────────────────────────
 export class AIService {
+
   /**
-   * Generates a fully personalized safety manual and checklist
+   * Generates a fully personalized safety manual and checklist using Gemini.
+   * Falls back to static template on API unavailability or malformed response.
    */
   static async generatePreparednessPlan(
     location: string,
@@ -48,134 +101,107 @@ export class AIService {
     members: any[],
     language: string = 'English'
   ) {
-    // Determine risk heuristically first for fallbacks
-    const isFloodZone = ['mumbai', 'chennai', 'kolkata', 'patna', 'assam', 'kerala', 'bengaluru'].some(c => 
-      location.toLowerCase().includes(c)
-    );
-    const riskLevel = (isFloodZone || buildingType === 'ground_floor') ? 'high' : 'moderate';
+    const riskLevel = getRiskLevel(location, buildingType);
 
     if (!genAI) {
-      console.warn('GEMINI_API_KEY is not defined. Falling back to local preparedness planner.');
-      const fallback = FALLBACK_PLANS[riskLevel];
-      return {
-        location,
-        householdSize,
-        buildingType,
-        vulnerabilities,
-        members,
-        riskLevel,
-        checklist: fallback.checklist,
-        safetyInstructions: fallback.safetyInstructions,
-        language
-      };
+      return { ...FALLBACK_PLANS[riskLevel], location, householdSize, buildingType, vulnerabilities, members, language };
     }
 
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
-      const prompt = `
-You are a senior crisis management and disaster safety expert specialized in Indian monsoon hazards (floods, waterlogging, high winds, landslides, structural failures, and vector-borne diseases).
+      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+      const prompt = `You are a senior crisis management and disaster safety expert specialized in Indian monsoon hazards.
 
 Generate a highly personalized Monsoon Preparedness Plan for:
 - Location: ${location}
 - Building Type: ${buildingType}
-- Family Directory Details:
+- Household Members (${householdSize} people):
 ${JSON.stringify(members, null, 2)}
-- Preferred Output Language: ${language}
+- Output Language: ${language}
 
-Your response must be a single, valid JSON object (no markdown backticks, no code blocks, just raw JSON). Use this exact schema structure:
+Respond with ONLY a raw JSON object (no markdown, no code fences). Use this schema exactly:
 {
   "riskLevel": "high" | "moderate" | "low",
   "checklist": [
-    { "id": "string", "item": "item name", "category": "Survival" | "Medical" | "Power" | "Safety" | "Documents", "quantity": "0", "requiredQuantity": "string", "completed": false }
+    { "id": "c1", "item": "item name", "category": "Survival" | "Medical" | "Power" | "Safety" | "Documents", "quantity": "0", "requiredQuantity": "amount", "completed": false }
   ],
   "safetyInstructions": [
-    { "phase": "before" | "during" | "after", "action": "short action title", "details": "detailed description of what to do" }
+    { "phase": "before" | "during" | "after", "action": "short action title", "details": "detailed description" }
   ]
 }
 
-Adjust quantities dynamically: base checklist quantities on the household members listed. Provide custom safety guidelines in safetyInstructions matching specific member profiles (e.g. if there is a senior citizen or infant, specify custom medical or evacuation tasks). Ensure the instructions and checklist are fully translated into ${language} if requested.
-`;
+Scale checklist quantities based on household size. If any member has special vulnerabilities (elderly, infant, medical), add specific custom items and instructions for them. Translate everything into ${language} if not English.`;
 
       const result = await model.generateContent(prompt);
       const text = result.response.text();
-      const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-      return JSON.parse(cleaned);
+      const parsed = safeJsonParse<any>(text);
+
+      if (!parsed || !parsed.riskLevel || !Array.isArray(parsed.checklist) || !Array.isArray(parsed.safetyInstructions)) {
+        console.warn('[RainReady] Gemini returned malformed plan JSON. Using fallback.');
+        return { ...FALLBACK_PLANS[riskLevel], location, householdSize, buildingType, vulnerabilities, members, language };
+      }
+
+      return parsed;
     } catch (error) {
-      console.error('Gemini plan generation failed, falling back:', error);
-      const fallback = FALLBACK_PLANS[riskLevel];
-      return {
-        location,
-        householdSize,
-        buildingType,
-        vulnerabilities,
-        members,
-        riskLevel,
-        checklist: fallback.checklist,
-        safetyInstructions: fallback.safetyInstructions,
-        language
-      };
+      console.error('[RainReady] Gemini plan generation failed:', error);
+      return { ...FALLBACK_PLANS[riskLevel], location, householdSize, buildingType, vulnerabilities, members, language };
     }
   }
 
   /**
-   * Assesses road/route travel safety parameters
+   * Assesses road/route travel safety using Gemini.
+   * Falls back to heuristic-based assessment if AI is unavailable.
    */
-  static async assessTravelSafety(
-    origin: string,
-    destination: string,
-    mode: string = 'driving'
-  ) {
+  static async assessTravelSafety(origin: string, destination: string, mode: string = 'driving') {
+    const fallback = {
+      hazardRating: 4,
+      advisory: 'Monsoon driving requires caution due to hydroplaning risks and reduced visibility.',
+      precautions: [
+        'Check tire tread depth and pressure before departure.',
+        'Keep headlamps on low beam in heavy rain.',
+        'Avoid driving through standing water — even 15cm can stall an engine.',
+      ]
+    };
+
     if (!genAI) {
-      console.warn('GEMINI_API_KEY missing. Falling back to local travel risk analyzer.');
-      const isLonavalaOrWesternGhats = [origin, destination].some(p => 
-        p.toLowerCase().includes('pune') || p.toLowerCase().includes('lonavala') || p.toLowerCase().includes('mumbai') || p.toLowerCase().includes('ghat')
+      const isGhatsRoute = [origin, destination].some(p =>
+        ['pune', 'lonavala', 'mumbai', 'ghat', 'nashik', 'mahabaleshwar'].some(k => p.toLowerCase().includes(k))
       );
-      return {
-        hazardRating: isLonavalaOrWesternGhats ? 7 : 3,
-        advisory: isLonavalaOrWesternGhats 
-          ? 'Western Ghats routes carry high landslide and heavy fog risks during monsoon storms. Drive with extreme caution.'
-          : 'Normal monsoon slick roads. Check wiper blades and reduce speeds.',
-        precautions: [
-          'Maintain double the normal stopping distance.',
-          'Avoid routes with low-lying subways or waterlogged underpasses.',
-          'Carry an emergency glass breaker and emergency contact card.'
-        ]
-      };
+      return isGhatsRoute
+        ? { hazardRating: 7, advisory: 'Western Ghats routes carry high landslide and fog risks during monsoon. Drive with extreme caution.', precautions: fallback.precautions }
+        : fallback;
     }
 
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
-      const prompt = `
-Analyze the safety of traveling from "${origin}" to "${destination}" via "${mode}" during a heavy rain/monsoon season.
-Assess potential waterlogging, landslide hazards, visibility, and road blockages typical for this route.
+      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+      const prompt = `Analyze the safety of traveling from "${origin}" to "${destination}" via "${mode}" during heavy monsoon rains in India.
 
-Provide a single, valid JSON object (no code blocks, no markdown backticks):
+Consider: waterlogging, landslide hazards, visibility, road blockages, and mode-specific risks.
+
+Respond with ONLY a raw JSON object (no markdown, no code fences):
 {
-  "hazardRating": number, // scale 1 (safe) to 10 (extremely dangerous)
-  "advisory": "string (main safety warning summary)",
-  "precautions": [
-    "precaution 1",
-    "precaution 2",
-    "precaution 3"
-  ]
-}
-`;
+  "hazardRating": <number 1-10>,
+  "advisory": "<main safety summary>",
+  "precautions": ["<precaution 1>", "<precaution 2>", "<precaution 3>"]
+}`;
+
       const result = await model.generateContent(prompt);
       const text = result.response.text();
-      const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-      return JSON.parse(cleaned);
+      const parsed = safeJsonParse<any>(text);
+
+      if (!parsed || typeof parsed.hazardRating !== 'number' || !parsed.advisory) {
+        console.warn('[RainReady] Malformed travel assessment from Gemini. Using fallback.');
+        return fallback;
+      }
+
+      return parsed;
     } catch (error) {
-      console.error('Gemini travel assessment failed, falling back:', error);
-      return {
-        hazardRating: 4,
-        advisory: 'Monsoon driving requires caution due to hydroplaning risks.',
-        precautions: ['Check tire tread depth', 'Keep headlamps on low beam', 'Avoid driving through standing water']
-      };
+      console.error('[RainReady] Gemini travel assessment failed:', error);
+      return fallback;
     }
   }
 
   /**
-   * Interactive emergency safety advisor chatbot
+   * Multilingual emergency safety assistant chatbot.
    */
   static async chatAssistant(
     history: { role: 'user' | 'model'; parts: string }[],
@@ -183,33 +209,32 @@ Provide a single, valid JSON object (no code blocks, no markdown backticks):
     language: string = 'English'
   ) {
     if (!genAI) {
-      console.warn('GEMINI_API_KEY missing. Falling back to local QA helper.');
       return {
-        reply: `[Offline Mode] Safety tip: If electrical mains are flooded, do not touch switches. Ensure you stay elevated. (Language: ${language})`
+        reply: `[Offline Mode] Safety tip: If electrical mains are flooded, do not touch switches. Stay elevated and call emergency services. (Language preference: ${language})`
       };
     }
 
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
-      
+      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+
       const chatHistory = history.map(h => ({
         role: h.role,
         parts: [{ text: h.parts }]
       }));
 
-      const systemPrompt = `You are a helpful, multilingual safety bot assisting citizens during monsoon emergencies. Respond accurately, briefly, and compassionately in the requested language: ${language}. Current query: ${message}`;
-      
+      const systemInstruction = `You are RainReady, a calm, accurate, and compassionate multilingual safety assistant helping Indian citizens during monsoon emergencies. Always respond in ${language}. Be concise (under 120 words). Prioritize life safety. Do not speculate. If unsure, recommend calling emergency services (112 in India).`;
+
       const chat = model.startChat({
         history: chatHistory,
-        generationConfig: { maxOutputTokens: 250 }
+        generationConfig: { maxOutputTokens: 300 }
       });
 
-      const result = await chat.sendMessage(systemPrompt);
+      const result = await chat.sendMessage(`${systemInstruction}\n\nUser: ${message}`);
       return { reply: result.response.text().trim() };
     } catch (error) {
-      console.error('Gemini chat failed:', error);
+      console.error('[RainReady] Gemini chat error:', error);
       return {
-        reply: 'Emergency safety channels are currently congested. Please seek immediate rescue support if in danger, or head to higher grounds.'
+        reply: 'Our safety assistant is temporarily unavailable. If you are in immediate danger, call 112 (India emergency). For flood rescue, contact NDRF at 011-24363260.'
       };
     }
   }

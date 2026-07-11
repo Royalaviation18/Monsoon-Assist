@@ -11,6 +11,7 @@ export const MultilingualChat: React.FC = () => {
   const [input, setInput] = useState('');
   const [language, setLanguage] = useState('English');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const LANGUAGES = ['English', 'Hindi', 'Bengali', 'Tamil', 'Telugu', 'Marathi'];
@@ -27,24 +28,24 @@ export const MultilingualChat: React.FC = () => {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setLoading(true);
+    setError(null);
 
     try {
       const res = await fetch('/api/monsoon/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: input,
-          history: messages,
-          language
-        })
+        body: JSON.stringify({ message: input, history: messages, language })
       });
 
       if (res.ok) {
         const data = await res.json();
         setMessages(prev => [...prev, { role: 'model', parts: data.reply }]);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.error || 'Safety assistant returned an error. Please try again.');
       }
-    } catch (err) {
-      console.error('Chat request failed:', err);
+    } catch {
+      setError('Network error. Could not reach the safety assistant. Check your connection.');
     } finally {
       setLoading(false);
     }
@@ -99,9 +100,10 @@ export const MultilingualChat: React.FC = () => {
       >
         {messages.length === 0 ? (
           <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-tertiary)', maxWidth: '260px' }}>
-            <ShieldAlert size={28} style={{ margin: '0 auto 8px auto', display: 'block', color: 'var(--text-tertiary)' }} />
-            <span style={{ fontSize: '0.8rem', display: 'block' }}>
-              Ask safety questions like "How to clean waterlogged rooms?" or "What to put in first aid?" in {language}.
+            <ShieldAlert size={28} style={{ margin: '0 auto 8px auto', display: 'block', color: 'var(--accent-color)' }} />
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', color: 'var(--text-primary)', marginBottom: '6px' }}>RainReady Safety Assistant</span>
+            <span style={{ fontSize: '0.78rem', display: 'block' }}>
+              Ask questions like "What to do if my home floods?" or "First aid for electrocution" in {language}.
             </span>
           </div>
         ) : (
@@ -124,8 +126,14 @@ export const MultilingualChat: React.FC = () => {
           ))
         )}
         {loading && (
-          <div style={{ alignSelf: 'flex-start', background: 'var(--bg-tertiary)', padding: '10px 14px', borderRadius: '12px', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>
-            Gemini is translating & typing...
+          <div style={{ alignSelf: 'flex-start', background: 'var(--bg-tertiary)', padding: '10px 14px', borderRadius: '12px', fontSize: '0.85rem', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className="spinner" style={{ width: '14px', height: '14px', borderWidth: '2px' }} />
+            Thinking in {language}...
+          </div>
+        )}
+        {error && (
+          <div style={{ alignSelf: 'stretch', background: 'rgba(244, 63, 94, 0.06)', border: '1px solid rgba(244, 63, 94, 0.2)', color: 'var(--error-color)', padding: '10px 14px', borderRadius: '8px', fontSize: '0.82rem' }}>
+            ⚠ {error}
           </div>
         )}
         <div ref={chatEndRef} />

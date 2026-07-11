@@ -34,6 +34,7 @@ export interface IPreparednessPlan extends Document {
   safetyInstructions: ISafetyInstruction[];
   language: string;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface ISafetyAlert extends Document {
@@ -78,8 +79,7 @@ const PreparednessPlanSchema = new Schema<IPreparednessPlan>({
   checklist: [ChecklistItemSchema],
   safetyInstructions: [SafetyInstructionSchema],
   language: { type: String, default: 'English' },
-  createdAt: { type: Date, default: Date.now }
-});
+}, { timestamps: true });
 
 // Indexes for query speed & database performance
 PreparednessPlanSchema.index({ location: 1 });
@@ -91,8 +91,7 @@ const SafetyAlertSchema = new Schema<ISafetyAlert>({
   message: { type: String, required: true },
   location: { type: String, required: true },
   recommendations: [{ type: String }],
-  createdAt: { type: Date, default: Date.now }
-});
+}, { timestamps: true });
 
 SafetyAlertSchema.index({ location: 1 });
 SafetyAlertSchema.index({ createdAt: -1 });

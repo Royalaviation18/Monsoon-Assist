@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { ShoppingCart, CheckSquare, Square } from 'lucide-react';
 
 interface ChecklistItem {
@@ -19,6 +19,18 @@ export const EmergencyChecklist: React.FC<EmergencyChecklistProps> = ({ checklis
   const completedCount = checklist.filter(x => x.completed).length;
   const totalCount = checklist.length;
   const percentComplete = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+  // Debounced quantity tracker — avoids an API PUT on every keystroke
+  const [localQtys, setLocalQtys] = useState<Record<string, string>>({});
+  const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const handleQtyChange = useCallback((item: ChecklistItem, value: string) => {
+    setLocalQtys(prev => ({ ...prev, [item.id]: value }));
+    clearTimeout(debounceTimers.current[item.id]);
+    debounceTimers.current[item.id] = setTimeout(() => {
+      onToggleItem(item.id, item.completed, value);
+    }, 800);
+  }, [onToggleItem]);
 
   // Group items by category
   const categories: Record<string, ChecklistItem[]> = {};
@@ -104,8 +116,8 @@ export const EmergencyChecklist: React.FC<EmergencyChecklistProps> = ({ checklis
                     {/* Editable Quantities */}
                     <input
                       type="text"
-                      value={item.quantity}
-                      onChange={(e) => onToggleItem(item.id, item.completed, e.target.value)}
+                      value={localQtys[item.id] ?? item.quantity}
+                      onChange={e => handleQtyChange(item, e.target.value)}
                       placeholder="Qty"
                       style={{
                         width: '70px',

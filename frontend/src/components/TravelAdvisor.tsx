@@ -7,10 +7,13 @@ export const TravelAdvisor: React.FC = () => {
   const [mode, setMode] = useState('driving');
   const [loading, setLoading] = useState(false);
   const [assessment, setAssessment] = useState<any | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
+    setAssessment(null);
     try {
       const res = await fetch('/api/monsoon/travel', {
         method: 'POST',
@@ -20,9 +23,12 @@ export const TravelAdvisor: React.FC = () => {
       if (res.ok) {
         const data = await res.json();
         setAssessment(data);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.error || 'Travel assessment failed. Please try again.');
       }
-    } catch (err) {
-      console.error('Travel assessment query failed:', err);
+    } catch {
+      setError('Network error. Could not reach the travel advisor. Check your connection.');
     } finally {
       setLoading(false);
     }
@@ -92,6 +98,11 @@ export const TravelAdvisor: React.FC = () => {
         </button>
       </form>
 
+      {error && (
+        <div style={{ background: 'rgba(244, 63, 94, 0.06)', border: '1px solid rgba(244, 63, 94, 0.2)', color: 'var(--error-color)', padding: '12px 16px', borderRadius: '8px', fontSize: '0.84rem' }}>
+          ⚠ {error}
+        </div>
+      )}
       {assessment && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '20px', animation: 'fadeIn 0.3s ease-out' }}>
           {/* Risk Badge */}

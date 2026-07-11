@@ -1,15 +1,40 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { PlanGenerator } from './components/PlanGenerator';
 import { EmergencyChecklist } from './components/EmergencyChecklist';
 import { TravelAdvisor } from './components/TravelAdvisor';
 import { MultilingualChat } from './components/MultilingualChat';
-import { Compass, AlertTriangle, ShieldCheck, Database, CloudRain, ArrowLeft } from 'lucide-react';
+import { Compass, AlertTriangle, ShieldCheck, Database, CloudRain, ArrowLeft, Trash2, PlusCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface SafetyInstruction {
   phase: 'before' | 'during' | 'after';
   action: string;
   details: string;
+}
+
+interface ChecklistItem {
+  id: string;
+  item: string;
+  category: string;
+  quantity: string;
+  requiredQuantity: string;
+  completed: boolean;
+}
+
+interface FamilyMember {
+  name: string;
+  age: number;
+  gender: string;
+  vulnerabilities: string[];
+}
+
+interface SafetyAlert {
+  _id: string;
+  title: string;
+  message: string;
+  severity: 'info' | 'warning' | 'critical';
 }
 
 interface PreparednessPlan {
@@ -19,38 +44,166 @@ interface PreparednessPlan {
   householdSize: number;
   buildingType: 'ground_floor' | 'high_rise' | 'independent';
   vulnerabilities: string[];
-  members: any[];
+  members: FamilyMember[];
   riskLevel: 'low' | 'moderate' | 'high';
-  checklist: any[];
+  checklist: ChecklistItem[];
   safetyInstructions: SafetyInstruction[];
   language: string;
   createdAt: string;
 }
 
+interface WeatherData {
+  temp: number;
+  windspeed: number;
+  condition: string;
+}
 
+// ─── Weather Condition Mapper ─────────────────────────────────────────────────
+const getWeatherCondition = (code: number): string => {
+  if (code === 0) return 'Clear Sky';
+  if (code <= 3) return 'Partly Cloudy';
+  if (code <= 48) return 'Foggy / Misty';
+  if (code <= 57) return 'Light Drizzle';
+  if (code <= 67) return 'Rain Showers';
+  if (code <= 77) return 'Sleet / Snow';
+  if (code <= 82) return 'Heavy Rain Showers';
+  if (code <= 99) return 'Thunderstorm ⚡';
+  return 'Cloudy';
+};
+
+// ─── Toast Component ──────────────────────────────────────────────────────────
+const Toast = ({ msg, type, onDismiss }: { msg: string; type: 'error' | 'success'; onDismiss: () => void }) => (
+  <div style={{
+    position: 'fixed',
+    bottom: '24px',
+    right: '24px',
+    background: type === 'error' ? 'rgba(244, 63, 94, 0.95)' : 'rgba(16, 185, 129, 0.95)',
+    color: '#fff',
+    padding: '12px 20px',
+    borderRadius: '10px',
+    fontSize: '0.875rem',
+    fontWeight: 600,
+    maxWidth: '360px',
+    zIndex: 9999,
+    display: 'flex',
+    gap: '12px',
+    alignItems: 'center',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+    animation: 'slideUp 0.25s ease-out',
+  }}>
+    <span style={{ flex: 1 }}>{msg}</span>
+    <button onClick={onDismiss} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}>✕</button>
+  </div>
+);
+
+// ─── Delete Confirm Inline Dialog ─────────────────────────────────────────────
+const DeleteConfirm = ({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) => (
+  <div style={{
+    background: '#fff',
+    border: '1px solid rgba(244, 63, 94, 0.2)',
+    borderRadius: '10px',
+    padding: '14px 18px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+    minWidth: '220px',
+    position: 'absolute',
+    top: '44px',
+    right: 0,
+    zIndex: 100,
+  }}>
+    <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+      Delete this household?
+    </div>
+    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+      This cannot be undone.
+    </div>
+    <div style={{ display: 'flex', gap: '8px' }}>
+      <button
+        onClick={onConfirm}
+        style={{ flex: 1, background: 'rgba(244, 63, 94, 0.9)', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+      >
+        Yes, Delete
+      </button>
+      <button
+        onClick={onCancel}
+        style={{ flex: 1, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '6px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+);
+
+// ─── App ──────────────────────────────────────────────────────────────────────
 
 function App() {
   const [view, setView] = useState<'setup' | 'dashboard'>('setup');
   const [plans, setPlans] = useState<PreparednessPlan[]>([]);
   const [plan, setPlan] = useState<PreparednessPlan | null>(null);
   const [loading, setLoading] = useState(false);
-  const [alerts, setAlerts] = useState<any[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [alerts, setAlerts] = useState<SafetyAlert[]>([]);
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const [activeTab, setActiveTab] = useState<'instructions' | 'checklist' | 'travel' | 'chat'>('instructions');
-  
-  // Weather State
-  const [weather, setWeather] = useState<{ temp: number; windspeed: number; condition: string } | null>(null);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' } | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Verify health status, connection, and fetch existing plans
-  useEffect(() => {
-    checkHealth();
-    fetchPlans();
+  const showToast = useCallback((msg: string, type: 'error' | 'success' = 'error') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 5000);
   }, []);
 
-  const checkHealth = async () => {
+  // ─── Fetch Weather ──────────────────────────────────────────────────────────
+  const fetchWeather = useCallback(async (locStr: string) => {
+    if (!locStr || locStr.trim().length < 2) return;
     try {
-      const res = await fetch('/api/health').catch(() => null);
-      if (res && res.ok) {
+      const geoRes = await fetch(
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locStr.trim())}&count=1&format=json`
+      );
+      if (!geoRes.ok) return;
+      const geoData = await geoRes.json();
+
+      if (geoData.results?.length > 0) {
+        const { latitude, longitude } = geoData.results[0];
+        const res = await fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&wind_speed_unit=kmh`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const cur = data.current_weather;
+        setWeather({
+          temp: cur.temperature,
+          windspeed: cur.windspeed,
+          condition: getWeatherCondition(cur.weathercode),
+        });
+      }
+    } catch {
+      // Weather is non-critical — silently fail
+    }
+  }, []);
+
+  // ─── Fetch Alerts ───────────────────────────────────────────────────────────
+  const fetchAlerts = useCallback(async (location: string) => {
+    if (!location?.trim()) return;
+    try {
+      const res = await fetch(`/api/monsoon/alerts/${encodeURIComponent(location)}`);
+      if (res.ok) {
+        const data: SafetyAlert[] = await res.json();
+        setAlerts(data);
+      }
+    } catch {
+      // Alerts are informational — silently fail
+    }
+  }, []);
+
+  // ─── Health Check ───────────────────────────────────────────────────────────
+  const checkHealth = useCallback(async () => {
+    try {
+      const res = await fetch('/api/health');
+      if (res.ok) {
         const data = await res.json();
         setDbStatus(data.database === 'connected' ? 'connected' : 'disconnected');
       } else {
@@ -59,13 +212,14 @@ function App() {
     } catch {
       setDbStatus('disconnected');
     }
-  };
+  }, []);
 
-  const fetchPlans = async () => {
+  // ─── Load Plans ─────────────────────────────────────────────────────────────
+  const fetchPlans = useCallback(async () => {
     try {
       const res = await fetch('/api/monsoon/plans');
       if (res.ok) {
-        const data = await res.json();
+        const data: PreparednessPlan[] = await res.json();
         setPlans(data);
         if (data.length > 0) {
           setPlan(data[0]);
@@ -74,27 +228,38 @@ function App() {
           fetchWeather(data[0].location);
         }
       }
-    } catch (err) {
-      console.error('Failed to load plans:', err);
+    } catch {
+      showToast('Could not load your household profiles. Is the backend running?', 'error');
+    } finally {
+      setInitialLoading(false);
     }
-  };
+  }, [fetchAlerts, fetchWeather, showToast]);
 
-  const handleSelectPlan = (planId: string) => {
+  useEffect(() => {
+    checkHealth();
+    fetchPlans();
+  }, [checkHealth, fetchPlans]);
+
+  // ─── Plan Selection ─────────────────────────────────────────────────────────
+  const handleSelectPlan = useCallback((planId: string) => {
     const selected = plans.find(p => p._id === planId);
     if (selected) {
       setPlan(selected);
       setView('dashboard');
+      setActiveTab('instructions');
       fetchAlerts(selected.location);
       fetchWeather(selected.location);
     }
-  };
+  }, [plans, fetchAlerts, fetchWeather]);
 
-  const handleDeletePlan = async (planId: string) => {
-    if (!confirm("Are you sure you want to delete this household profile?")) return;
+  // ─── Plan Deletion ──────────────────────────────────────────────────────────
+  const handleDeletePlan = useCallback(async () => {
+    if (!plan) return;
+    setShowDeleteConfirm(false);
     try {
-      const res = await fetch(`/api/monsoon/plan/${planId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/monsoon/plan/${plan._id}`, { method: 'DELETE' });
       if (res.ok) {
-        const updated = plans.filter(p => p._id !== planId);
+        const updated = plans.filter(p => p._id !== plan._id);
         setPlans(updated);
         if (updated.length > 0) {
           setPlan(updated[0]);
@@ -105,51 +270,19 @@ function App() {
           setPlan(null);
           setView('setup');
           setWeather(null);
+          setAlerts([]);
         }
+        showToast('Household profile deleted.', 'success');
+      } else {
+        showToast('Failed to delete profile. Please try again.', 'error');
       }
-    } catch (err) {
-      console.error('Delete failed:', err);
+    } catch {
+      showToast('Network error while deleting profile.', 'error');
     }
-  };
+  }, [plan, plans, fetchAlerts, fetchWeather, showToast]);
 
-  const fetchWeather = async (locStr: string) => {
-    try {
-      const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locStr)}&count=1&format=json`);
-      if (geoRes.ok) {
-        const geoData = await geoRes.json();
-        if (geoData.results && geoData.results.length > 0) {
-          const { latitude, longitude } = geoData.results[0];
-          const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
-          if (res.ok) {
-            const data = await res.json();
-            const cur = data.current_weather;
-            setWeather({
-              temp: cur.temperature,
-              windspeed: cur.windspeed,
-              condition: cur.weathercode >= 51 ? 'Heavy Rain' : 'Light Drizzle / Cloudy'
-            });
-            return;
-          }
-        }
-      }
-      
-      // Fallback if geocoding fails
-      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=19.0760&longitude=72.8777&current_weather=true`);
-      if (res.ok) {
-        const data = await res.json();
-        const cur = data.current_weather;
-        setWeather({
-          temp: cur.temperature,
-          windspeed: cur.windspeed,
-          condition: cur.weathercode >= 51 ? 'Heavy Rain' : 'Light Drizzle / Cloudy'
-        });
-      }
-    } catch (err) {
-      console.warn('Weather API failed:', err);
-    }
-  };
-
-  const handleCreatePlan = async (formData: any) => {
+  // ─── Plan Creation ──────────────────────────────────────────────────────────
+  const handleCreatePlan = useCallback(async (formData: any) => {
     setLoading(true);
     try {
       const res = await fetch('/api/monsoon/plan', {
@@ -157,79 +290,101 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
+
       if (res.ok) {
-        const data = await res.json();
+        const data: PreparednessPlan = await res.json();
         setPlans(prev => [data, ...prev]);
         setPlan(data);
         setView('dashboard');
-        confetti(); // Celebratory effect on plan creation success
-        
-        // Fetch alerts & live weather
+        setActiveTab('instructions');
+        confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
         fetchAlerts(formData.location);
         fetchWeather(formData.location);
+        showToast('Preparedness plan created successfully! 🎉', 'success');
+      } else {
+        const errData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        showToast(errData.error || 'Failed to create plan. Please try again.', 'error');
       }
-    } catch (err) {
-      console.error('Plan creation failed:', err);
+    } catch {
+      showToast('Network error. Please check your connection and try again.', 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchAlerts, fetchWeather, showToast]);
 
-  const fetchAlerts = async (location: string) => {
-    try {
-      const res = await fetch(`/api/monsoon/alerts/${location}`);
-      if (res.ok) {
-        const data = await res.json();
-        setAlerts(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch alerts:', err);
-    }
-  };
-
-  const handleToggleChecklistItem = async (itemId: string, completed: boolean, quantity: string) => {
+  // ─── Checklist Toggle ───────────────────────────────────────────────────────
+  const handleToggleChecklistItem = useCallback(async (itemId: string, completed: boolean, quantity: string) => {
     if (!plan) return;
 
-    // Optimistic Update
+    // Optimistic update
     const updatedChecklist = plan.checklist.map(item =>
       item.id === itemId ? { ...item, completed, quantity } : item
     );
     setPlan({ ...plan, checklist: updatedChecklist });
 
     try {
-      await fetch(`/api/monsoon/plan/${plan._id}/checklist`, {
+      const res = await fetch(`/api/monsoon/plan/${plan._id}/checklist`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ itemId, completed, quantity })
       });
-    } catch (err) {
-      console.error('Checklist sync failed:', err);
+      if (!res.ok) {
+        // Rollback optimistic update on failure
+        setPlan({ ...plan });
+        showToast('Failed to save checklist update.', 'error');
+      }
+    } catch {
+      setPlan({ ...plan });
+      showToast('Network error while syncing checklist.', 'error');
     }
-  };
+  }, [plan, showToast]);
 
+  // ─── Computed Values ────────────────────────────────────────────────────────
+  const checklistTotal = plan?.checklist.length ?? 0;
+  const checklistDone = plan?.checklist.filter(x => x.completed).length ?? 0;
+  const completionPct = checklistTotal > 0 ? Math.round((checklistDone / checklistTotal) * 100) : 0;
+
+  // ─── Loading Splash ─────────────────────────────────────────────────────────
+  if (initialLoading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+        <CloudRain size={36} style={{ color: 'var(--accent-color)' }} />
+        <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-primary)' }}>Loading RainReady...</div>
+        <div className="spinner" />
+      </div>
+    );
+  }
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '30px 20px', display: 'flex', flexDirection: 'column', gap: '30px', minHeight: '100vh' }}>
-      
-      {/* Header bar */}
+
+      {/* Toast Notification */}
+      {toast && <Toast msg={toast.msg} type={toast.type} onDismiss={() => setToast(null)} />}
+
+      {/* ─── Header ─────────────────────────────────────────────────────────── */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <CloudRain size={28} style={{ color: 'var(--accent-color)' }} />
           <div>
             <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-              MONSOON<span style={{ color: 'var(--accent-color)' }}>ASSIST</span>
+              RAIN<span style={{ color: 'var(--accent-color)' }}>READY</span>
             </h1>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>GENAI EMERGENCY PREPAREDNESS</p>
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', fontWeight: 500, letterSpacing: '0.03em' }}>
+              YOUR AI-POWERED MONSOON SAFETY COMPANION
+            </p>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Family Profiles Dropdown */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+
+          {/* Household Selector */}
           {plans.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-tertiary)' }}>ACTIVE FAMILY:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>ACTIVE HOUSEHOLD:</span>
               <select
                 value={plan?._id || ''}
-                onChange={(e) => handleSelectPlan(e.target.value)}
+                onChange={e => handleSelectPlan(e.target.value)}
                 style={{
                   background: 'var(--bg-secondary)',
                   border: '1px solid var(--border-color)',
@@ -238,36 +393,51 @@ function App() {
                   borderRadius: '20px',
                   fontSize: '0.75rem',
                   fontWeight: 600,
-                  width: 'auto',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  maxWidth: '180px',
                 }}
               >
                 {plans.map(p => (
-                  <option key={p._id} value={p._id}>{p.profileName || 'Household'} ({p.location})</option>
+                  <option key={p._id} value={p._id}>
+                    {p.profileName || 'Household'} ({p.location})
+                  </option>
                 ))}
               </select>
+
+              {/* Delete trigger */}
               {plan && (
-                <button
-                  onClick={() => handleDeletePlan(plan._id)}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid var(--border-color)',
-                    color: 'var(--error-color)',
-                    padding: '5px 10px',
-                    borderRadius: '20px',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                    fontWeight: 600
-                  }}
-                  title="Delete active household profile"
-                >
-                  ✕ Delete
-                </button>
+                <div style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => setShowDeleteConfirm(v => !v)}
+                    title="Delete active household"
+                    aria-label="Delete household"
+                    style={{
+                      background: 'transparent',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--error-color)',
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                  {showDeleteConfirm && (
+                    <DeleteConfirm
+                      onConfirm={handleDeletePlan}
+                      onCancel={() => setShowDeleteConfirm(false)}
+                    />
+                  )}
+                </div>
               )}
             </div>
           )}
 
-          {/* New Profile button */}
+          {/* Add Household */}
           <button
             onClick={() => setView('setup')}
             style={{
@@ -281,27 +451,28 @@ function App() {
               fontWeight: 700,
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '4px',
+              whiteSpace: 'nowrap',
             }}
           >
-            + Add Household
+            <PlusCircle size={13} />
+            Add Household
           </button>
 
-
-          
-          {/* Database Health Badge */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-secondary)', padding: '6px 12px', borderRadius: '20px', border: '1px solid var(--border-color)' }}>
-            <Database size={12} style={{ color: dbStatus === 'connected' ? 'var(--success-color)' : 'var(--error-color)' }} />
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              DB: {dbStatus === 'checking' ? 'Connecting...' : dbStatus === 'connected' ? 'Atlas Connected' : 'Offline Mode'}
+          {/* DB Status Badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-secondary)', padding: '6px 12px', borderRadius: '20px', border: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>
+            <Database size={11} style={{ color: dbStatus === 'connected' ? 'var(--success-color)' : 'var(--error-color)' }} />
+            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              {dbStatus === 'checking' ? 'Connecting...' : dbStatus === 'connected' ? 'DB Connected' : 'Offline Mode'}
             </span>
           </div>
         </div>
       </header>
 
-      {/* Main body content */}
+      {/* ─── Main Content ────────────────────────────────────────────────────── */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        
+
+        {/* Setup View */}
         {view === 'setup' && (
           <div style={{ maxWidth: '640px', margin: '30px auto', width: '100%', animation: 'slideUp 0.3s ease-out', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {plans.length > 0 && (
@@ -317,69 +488,73 @@ function App() {
           </div>
         )}
 
+        {/* Dashboard View */}
         {view === 'dashboard' && plan && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', animation: 'fadeIn 0.2s ease-out' }}>
-            
-            {/* Top Stats Overview */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+
+            {/* Stats Row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
               <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>MONSOON RISK LEVEL</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: plan.riskLevel === 'high' ? 'var(--error-color)' : 'var(--warning-color)', textTransform: 'uppercase', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.04em' }}>MONSOON RISK LEVEL</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: plan.riskLevel === 'high' ? 'var(--error-color)' : plan.riskLevel === 'moderate' ? 'var(--warning-color)' : 'var(--success-color)', textTransform: 'uppercase', marginTop: '2px' }}>
                     {plan.riskLevel} Risk
                   </div>
                 </div>
-                <AlertTriangle size={24} style={{ color: plan.riskLevel === 'high' ? 'var(--error-color)' : 'var(--warning-color)' }} />
+                <AlertTriangle size={22} style={{ color: plan.riskLevel === 'high' ? 'var(--error-color)' : 'var(--warning-color)', flexShrink: 0 }} />
               </div>
 
               <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>LOCATION PREPARED</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.04em' }}>LOCATION PREPARED</div>
+                  <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
                     {plan.location}
                   </div>
                 </div>
-                <Compass size={24} style={{ color: 'var(--accent-color)' }} />
+                <Compass size={22} style={{ color: 'var(--accent-color)', flexShrink: 0 }} />
               </div>
 
               {weather && (
                 <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>LIVE WEATHER</div>
-                    <div style={{ fontSize: '1.3rem', fontWeight: 850, color: 'var(--text-primary)', marginTop: '2px' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.04em' }}>LIVE WEATHER</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>
                       {weather.temp}°C • {weather.condition}
                     </div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>Wind {weather.windspeed} km/h</div>
                   </div>
-                  <CloudRain size={24} style={{ color: 'var(--accent-color)' }} />
+                  <CloudRain size={22} style={{ color: 'var(--accent-color)', flexShrink: 0 }} />
                 </div>
               )}
 
               <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>SUPPLIES READY</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--success-color)', marginTop: '2px' }}>
-                    {Math.round((plan.checklist.filter(x => x.completed).length / plan.checklist.length) * 100)}%
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.04em' }}>SUPPLIES READY</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: completionPct === 100 ? 'var(--success-color)' : 'var(--text-primary)', marginTop: '2px' }}>
+                    {completionPct}%
                   </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>{checklistDone}/{checklistTotal} items stocked</div>
                 </div>
-                <ShieldCheck size={24} style={{ color: 'var(--success-color)' }} />
+                <ShieldCheck size={22} style={{ color: 'var(--success-color)', flexShrink: 0 }} />
               </div>
             </div>
 
-            {/* Active Family Members Directory (Read-only on Dashboard) */}
+            {/* Members Directory (Read-only) */}
             {plan.members && plan.members.length > 0 && (
-              <div className="glass-card" style={{ padding: '16px' }}>
-                <h4 style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-tertiary)', marginBottom: '10px', letterSpacing: '0.05em' }}>
-                  MEMBERS REGISTERED IN THIS HOUSEHOLD
+              <div className="glass-card" style={{ padding: '16px 20px' }}>
+                <h4 style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-tertiary)', marginBottom: '12px', letterSpacing: '0.05em' }}>
+                  HOUSEHOLD MEMBERS — {plan.profileName}
                 </h4>
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  {plan.members.map((m: any, idx: number) => (
+                  {plan.members.map((m, idx) => (
                     <div key={idx} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 12px', fontSize: '0.8rem' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{m.name}</span> ({m.gender}, {m.age} yrs)
+                      <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{m.name}</span>
+                      <span style={{ color: 'var(--text-secondary)' }}> · {m.gender}, {m.age} yrs</span>
                       {m.vulnerabilities?.length > 0 && (
-                        <div style={{ display: 'inline-flex', gap: '4px', marginLeft: '8px' }}>
-                          {m.vulnerabilities.map((v: string) => (
-                            <span key={v} style={{ fontSize: '0.65rem', background: 'rgba(244, 63, 94, 0.1)', color: 'var(--error-color)', padding: '1px 4px', borderRadius: '4px' }}>
-                              {v === 'mobility' ? 'Mobility' : v === 'infant' ? 'Infant' : v === 'medical' ? 'Medical' : v}
+                        <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
+                          {m.vulnerabilities.map(v => (
+                            <span key={v} style={{ fontSize: '0.65rem', background: 'rgba(244, 63, 94, 0.08)', color: 'var(--error-color)', padding: '1px 5px', borderRadius: '4px', border: '1px solid rgba(244, 63, 94, 0.15)' }}>
+                              {v === 'mobility' ? '♿ Mobility' : v === 'infant' ? '🍼 Infant' : v === 'medical' ? '💊 Medical' : v}
                             </span>
                           ))}
                         </div>
@@ -390,28 +565,28 @@ function App() {
               </div>
             )}
 
-            {/* Active alerts display */}
+            {/* Safety Alerts */}
             {alerts.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(244, 63, 94, 0.05)', border: '1px solid rgba(244, 63, 94, 0.15)', borderRadius: '8px', padding: '16px' }}>
-                <h4 style={{ color: 'var(--error-color)', fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <AlertTriangle size={16} /> Severe Weather Warning for {plan.location}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'rgba(244, 63, 94, 0.04)', border: '1px solid rgba(244, 63, 94, 0.15)', borderRadius: '10px', padding: '16px' }}>
+                <h4 style={{ color: 'var(--error-color)', fontSize: '0.875rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <AlertTriangle size={15} /> Severe Weather Warning for {plan.location}
                 </h4>
-                {alerts.map((alert, idx) => (
-                  <div key={idx} style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '4px' }}>
+                {alerts.map((alert) => (
+                  <div key={alert._id} style={{ fontSize: '0.84rem', color: 'var(--text-primary)', paddingLeft: '21px' }}>
                     <strong>{alert.title}</strong>: {alert.message}
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Sub-panel Tab Navs */}
-            <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '1px' }}>
+            {/* Tabs */}
+            <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid var(--border-color)' }}>
               {(['instructions', 'checklist', 'travel', 'chat'] as const).map(tab => {
                 const labelMap = {
-                  instructions: 'Personalized Manual',
-                  checklist: 'Survival Checklist',
+                  instructions: 'Safety Manual',
+                  checklist: 'Supplies Tracker',
                   travel: 'Travel Advisory',
-                  chat: 'Emergency QA Bot'
+                  chat: 'Safety Assistant',
                 };
                 const active = activeTab === tab;
                 return (
@@ -423,11 +598,12 @@ function App() {
                       border: 'none',
                       borderBottom: active ? '2px solid var(--accent-color)' : '2px solid transparent',
                       color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-                      fontSize: '0.9rem',
-                      fontWeight: 600,
+                      fontSize: '0.875rem',
+                      fontWeight: active ? 700 : 500,
                       padding: '10px 16px',
                       cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      transition: 'all 0.15s ease',
+                      whiteSpace: 'nowrap',
                     }}
                   >
                     {labelMap[tab]}
@@ -436,25 +612,27 @@ function App() {
               })}
             </div>
 
-            {/* Sub-panels display */}
+            {/* Tab Panels */}
             <div style={{ minHeight: '350px' }}>
               {activeTab === 'instructions' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
                   {(['before', 'during', 'after'] as const).map(phase => {
                     const instructions = plan.safetyInstructions.filter(i => i.phase === phase);
-                    const phaseTitle = phase === 'before' ? 'Before Severe Weather' : phase === 'during' ? 'During Storm/Flood' : 'After Severe Weather';
-                    const phaseColor = phase === 'before' ? 'var(--success-color)' : phase === 'during' ? 'var(--warning-color)' : 'var(--text-secondary)';
-                    
+                    const phaseTitle = { before: 'Before Severe Weather', during: 'During Storm / Flood', after: 'After Severe Weather' }[phase];
+                    const phaseColor = { before: 'var(--success-color)', during: 'var(--warning-color)', after: 'var(--text-secondary)' }[phase];
                     return (
                       <div key={phase} className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: phaseColor }}>{phaseTitle}</h3>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: phaseColor }}>{phaseTitle}</h3>
+                        {instructions.length === 0 && (
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)' }}>No instructions for this phase.</div>
+                        )}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                           {instructions.map((inst, idx) => (
                             <div key={idx} style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
-                              <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                              <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-primary)' }}>
                                 {idx + 1}. {inst.action}
                               </div>
-                              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: 1.5 }}>
                                 {inst.details}
                               </div>
                             </div>
@@ -467,35 +645,33 @@ function App() {
               )}
 
               {activeTab === 'checklist' && (
-                <div style={{ maxWidth: '640px', margin: '0 auto' }}>
-                  <EmergencyChecklist
-                    checklist={plan.checklist}
-                    onToggleItem={handleToggleChecklistItem}
-                  />
+                <div style={{ maxWidth: '680px', margin: '0 auto' }}>
+                  {plan.checklist.length === 0
+                    ? <div className="glass-card" style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: '40px' }}>No checklist items generated. Regenerate your plan.</div>
+                    : <EmergencyChecklist checklist={plan.checklist} onToggleItem={handleToggleChecklistItem} />
+                  }
                 </div>
               )}
 
               {activeTab === 'travel' && (
-                <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+                <div style={{ maxWidth: '680px', margin: '0 auto' }}>
                   <TravelAdvisor />
                 </div>
               )}
 
               {activeTab === 'chat' && (
-                <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+                <div style={{ maxWidth: '680px', margin: '0 auto' }}>
                   <MultilingualChat />
                 </div>
               )}
             </div>
-
           </div>
         )}
-
       </main>
 
-      {/* Footer bar */}
-      <footer style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
-        © 2026 Monsoon Assist. Designed for citizen safety and disaster risk reduction.
+      {/* ─── Footer ──────────────────────────────────────────────────────────── */}
+      <footer style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-tertiary)', letterSpacing: '0.02em' }}>
+        © 2026 RainReady — AI-Powered Monsoon Safety Companion. Designed for citizen safety and disaster risk reduction.
       </footer>
     </div>
   );
