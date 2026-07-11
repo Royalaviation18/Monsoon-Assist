@@ -128,9 +128,21 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmedProfileName = profileName.trim();
+    const trimmedLocation = location.trim();
+
+    if (trimmedProfileName.length < 2 || trimmedLocation.length < 2) {
+      return;
+    }
+
+    if (members.length === 0) {
+      alert("Please add at least one household member.");
+      return;
+    }
+
     onSubmit({
-      profileName,
-      location,
+      profileName: trimmedProfileName,
+      location: trimmedLocation,
       householdSize: members.length,
       buildingType,
       vulnerabilities: Array.from(new Set(members.flatMap(m => m.vulnerabilities))),
