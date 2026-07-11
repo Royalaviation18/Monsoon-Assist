@@ -1,5 +1,54 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface FamilyMemberInput {
+  name: string;
+  age: number;
+  gender: string;
+  vulnerabilities: string[];
+}
+
+export interface ChecklistItemResult {
+  id: string;
+  item: string;
+  category: 'Survival' | 'Medical' | 'Power' | 'Safety' | 'Documents';
+  quantity: string;
+  requiredQuantity: string;
+  completed: boolean;
+}
+
+export interface SafetyInstructionResult {
+  phase: 'before' | 'during' | 'after';
+  action: string;
+  details: string;
+}
+
+export interface PreparednessPlanResult {
+  riskLevel: 'high' | 'moderate' | 'low';
+  checklist: ChecklistItemResult[];
+  safetyInstructions: SafetyInstructionResult[];
+  location: string;
+  householdSize: number;
+  buildingType: string;
+  vulnerabilities: string[];
+  members: FamilyMemberInput[];
+  language: string;
+}
+
+export interface TravelAssessmentResult {
+  hazardRating: number;
+  advisory: string;
+  precautions: string[];
+}
+
+export interface LocationAlertResult {
+  severity: 'info' | 'warning' | 'critical';
+  title: string;
+  message: string;
+  recommendations: string[];
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 const apiKey = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash-latest';
@@ -27,7 +76,7 @@ const safeJsonParse = <T>(text: string): T | null => {
 };
 
 // ─── Fallback Databases ───────────────────────────────────────────────────────
-const FALLBACK_PLANS: Record<'high' | 'moderate' | 'low', any> = {
+const FALLBACK_PLANS: Record<'high' | 'moderate' | 'low', Omit<PreparednessPlanResult, 'location' | 'householdSize' | 'buildingType' | 'vulnerabilities' | 'members' | 'language'>> = {
   high: {
     riskLevel: 'high',
     checklist: [
@@ -45,7 +94,7 @@ const FALLBACK_PLANS: Record<'high' | 'moderate' | 'low', any> = {
       { phase: 'during', action: 'Stay on upper floors', details: 'If ground floor floods, move to upper floors and signal rescuers from windows.' },
       { phase: 'after', action: 'Sanitize standing water spots', details: 'Clean up residues and use disinfectant to prevent dengue/malaria breeding.' },
       { phase: 'after', action: 'Do not drink tap water', details: 'After flooding, treat all tap water as contaminated. Use stored bottled water only.' },
-    ]
+    ],
   },
   moderate: {
     riskLevel: 'moderate',
@@ -59,7 +108,7 @@ const FALLBACK_PLANS: Record<'high' | 'moderate' | 'low', any> = {
       { phase: 'before', action: 'Inspect roof and gutters', details: 'Clear dry leaves and seal visible cracks to prevent ceiling leaks.' },
       { phase: 'during', action: 'Stay indoors during heavy downpours', details: 'Avoid parking under weak structures or trees.' },
       { phase: 'after', action: 'Check vehicle tires and brakes', details: 'Ensure proper grip before driving on slick tarmac.' },
-    ]
+    ],
   },
   low: {
     riskLevel: 'low',
@@ -71,8 +120,8 @@ const FALLBACK_PLANS: Record<'high' | 'moderate' | 'low', any> = {
       { phase: 'before', action: 'Standard monsoon prep', details: 'Check drainage around your home and secure outdoor furniture.' },
       { phase: 'during', action: 'Drive carefully', details: 'Reduced visibility and wet roads require slower speeds.' },
       { phase: 'after', action: 'Check for dampness', details: 'Inspect walls and ceiling for seepage after heavy rains.' },
-    ]
-  }
+    ],
+  },
 };
 
 // ─── Risk Heuristic ───────────────────────────────────────────────────────────
@@ -83,7 +132,8 @@ const getRiskLevel = (location: string, buildingType: string): 'high' | 'moderat
   const isFloodZone = HIGH_RISK_ZONES.some(c => loc.includes(c));
   if (isFloodZone || buildingType === 'ground_floor') return 'high';
   if (buildingType === 'high_rise') return 'moderate';
-  return 'moderate';
+  // independent house outside a high-risk zone → genuinely low risk
+  return isFloodZone ? 'moderate' : 'low';
 };
 
 // ─── AI Service ───────────────────────────────────────────────────────────────
@@ -91,21 +141,20 @@ export class AIService {
 
   /**
    * Generates a fully personalized safety manual and checklist using Gemini.
-   * Falls back to static template on API unavailability or malformed response.
+   * Falls back to a static template on API unavailability or malformed response.
    */
   static async generatePreparednessPlan(
     location: string,
     householdSize: number,
     buildingType: 'ground_floor' | 'high_rise' | 'independent',
     vulnerabilities: string[],
-    members: any[],
+    members: FamilyMemberInput[],
     language: string = 'English'
-  ) {
+  ): Promise<PreparednessPlanResult> {
     const riskLevel = getRiskLevel(location, buildingType);
+    const fallback: PreparednessPlanResult = { ...FALLBACK_PLANS[riskLevel], location, householdSize, buildingType, vulnerabilities, members, language };
 
-    if (!genAI) {
-      return { ...FALLBACK_PLANS[riskLevel], location, householdSize, buildingType, vulnerabilities, members, language };
-    }
+    if (!genAI) return fallback;
 
     try {
       const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
@@ -118,6 +167,8 @@ Generate a highly personalized Monsoon Preparedness Plan for:
 ${JSON.stringify(members, null, 2)}
 - Output Language: ${language}
 
+IMPORTANT: You MUST include at least 2 instructions for EACH of the three phases: "before", "during", and "after".
+
 Respond with ONLY a raw JSON object (no markdown, no code fences). Use this schema exactly:
 {
   "riskLevel": "high" | "moderate" | "low",
@@ -129,37 +180,40 @@ Respond with ONLY a raw JSON object (no markdown, no code fences). Use this sche
   ]
 }
 
-Scale checklist quantities based on household size. If any member has special vulnerabilities (elderly, infant, medical), add specific custom items and instructions for them. Translate everything into ${language} if not English.`;
+Rules:
+- Scale checklist quantities based on household size (${householdSize} people).
+- For any vulnerable member (elderly, infant, medical condition), add specific checklist items and instructions tailored to their needs.
+- Include at least 1 community-level instruction per phase — actions this household can take WITH or FOR neighbours (e.g. checking on elderly neighbours, coordinating evacuation, sharing supplies).
+- Translate all output into ${language} if not English.`;
 
       const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      const parsed = safeJsonParse<any>(text);
+      const parsed = safeJsonParse<PreparednessPlanResult>(result.response.text());
 
       if (!parsed || !parsed.riskLevel || !Array.isArray(parsed.checklist) || !Array.isArray(parsed.safetyInstructions)) {
         console.warn('[RainReady] Gemini returned malformed plan JSON. Using fallback.');
-        return { ...FALLBACK_PLANS[riskLevel], location, householdSize, buildingType, vulnerabilities, members, language };
+        return fallback;
       }
 
-      return parsed;
+      return { ...parsed, location, householdSize, buildingType, vulnerabilities, members, language };
     } catch (error) {
       console.error('[RainReady] Gemini plan generation failed:', error);
-      return { ...FALLBACK_PLANS[riskLevel], location, householdSize, buildingType, vulnerabilities, members, language };
+      return fallback;
     }
   }
 
   /**
    * Assesses road/route travel safety using Gemini.
-   * Falls back to heuristic-based assessment if AI is unavailable.
+   * Falls back to a heuristic-based assessment if AI is unavailable.
    */
-  static async assessTravelSafety(origin: string, destination: string, mode: string = 'driving') {
-    const fallback = {
+  static async assessTravelSafety(origin: string, destination: string, mode: string = 'driving'): Promise<TravelAssessmentResult> {
+    const fallback: TravelAssessmentResult = {
       hazardRating: 4,
       advisory: 'Monsoon driving requires caution due to hydroplaning risks and reduced visibility.',
       precautions: [
         'Check tire tread depth and pressure before departure.',
         'Keep headlamps on low beam in heavy rain.',
         'Avoid driving through standing water — even 15cm can stall an engine.',
-      ]
+      ],
     };
 
     if (!genAI) {
@@ -185,8 +239,7 @@ Respond with ONLY a raw JSON object (no markdown, no code fences):
 }`;
 
       const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      const parsed = safeJsonParse<any>(text);
+      const parsed = safeJsonParse<TravelAssessmentResult>(result.response.text());
 
       if (!parsed || typeof parsed.hazardRating !== 'number' || !parsed.advisory) {
         console.warn('[RainReady] Malformed travel assessment from Gemini. Using fallback.');
@@ -201,16 +254,58 @@ Respond with ONLY a raw JSON object (no markdown, no code fences):
   }
 
   /**
+   * Generates a real-time monsoon alert for a given city using Gemini.
+   * Used as a fallback when no DB alert exists for the requested location.
+   */
+  static async generateLocationAlert(location: string): Promise<LocationAlertResult> {
+    const fallback: LocationAlertResult = {
+      severity: 'info',
+      title: `Monsoon Advisory — ${location}`,
+      message: `Monsoon conditions are active. Stay informed via local authorities and keep emergency supplies stocked.`,
+      recommendations: [
+        'Store at least 3 days of drinking water and dry food.',
+        'Keep power banks and torches fully charged.',
+        'Avoid waterlogged roads and open drains.',
+      ],
+    };
+
+    if (!genAI) return fallback;
+
+    try {
+      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+      const prompt = `You are a certified Indian disaster-management expert. Generate a real-time monsoon safety alert for ${location} during the active monsoon season.
+
+Respond with ONLY a raw JSON object (no markdown, no code fences):
+{
+  "severity": "info" | "warning" | "critical",
+  "title": "<concise alert title>",
+  "message": "<1-2 sentence situational summary for ${location}>",
+  "recommendations": ["<action 1>", "<action 2>", "<action 3>"]
+}`;
+
+      const result = await model.generateContent(prompt);
+      const parsed = safeJsonParse<LocationAlertResult>(result.response.text());
+
+      if (!parsed || !parsed.severity || !parsed.title || !parsed.message) {
+        return fallback;
+      }
+      return parsed;
+    } catch {
+      return fallback;
+    }
+  }
+
+  /**
    * Multilingual emergency safety assistant chatbot.
    */
   static async chatAssistant(
     history: { role: 'user' | 'model'; parts: string }[],
     message: string,
     language: string = 'English'
-  ) {
+  ): Promise<{ reply: string }> {
     if (!genAI) {
       return {
-        reply: `[Offline Mode] Safety tip: If electrical mains are flooded, do not touch switches. Stay elevated and call emergency services. (Language preference: ${language})`
+        reply: `[Offline Mode] Safety tip: If electrical mains are flooded, do not touch switches. Stay elevated and call emergency services. (Language preference: ${language})`,
       };
     }
 
@@ -219,14 +314,14 @@ Respond with ONLY a raw JSON object (no markdown, no code fences):
 
       const chatHistory = history.map(h => ({
         role: h.role,
-        parts: [{ text: h.parts }]
+        parts: [{ text: h.parts }],
       }));
 
       const systemInstruction = `You are RainReady, a calm, accurate, and compassionate multilingual safety assistant helping Indian citizens during monsoon emergencies. Always respond in ${language}. Be concise (under 120 words). Prioritize life safety. Do not speculate. If unsure, recommend calling emergency services (112 in India).`;
 
       const chat = model.startChat({
         history: chatHistory,
-        generationConfig: { maxOutputTokens: 300 }
+        generationConfig: { maxOutputTokens: 300 },
       });
 
       const result = await chat.sendMessage(`${systemInstruction}\n\nUser: ${message}`);
@@ -234,7 +329,7 @@ Respond with ONLY a raw JSON object (no markdown, no code fences):
     } catch (error) {
       console.error('[RainReady] Gemini chat error:', error);
       return {
-        reply: 'Our safety assistant is temporarily unavailable. If you are in immediate danger, call 112 (India emergency). For flood rescue, contact NDRF at 011-24363260.'
+        reply: 'Our safety assistant is temporarily unavailable. If you are in immediate danger, call 112 (India emergency). For flood rescue, contact NDRF at 011-24363260.',
       };
     }
   }

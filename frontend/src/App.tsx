@@ -36,6 +36,7 @@ interface SafetyAlert {
   title: string;
   message: string;
   severity: 'info' | 'warning' | 'critical';
+  recommendations: string[];
 }
 
 interface PreparednessPlan {
@@ -72,6 +73,16 @@ const getWeatherCondition = (code: number): string => {
   return 'Cloudy';
 };
 
+// ─── Static style constants (hoisted to avoid object recreation on every render) ─
+const LAYOUT_STYLE: React.CSSProperties = { maxWidth: '1200px', margin: '0 auto', padding: '30px 20px', display: 'flex', flexDirection: 'column', gap: '30px', minHeight: '100vh' };
+const HEADER_STYLE: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' };
+const BRAND_WRAP_STYLE: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '10px' };
+const STATS_GRID_STYLE: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' };
+const STAT_CARD_STYLE: React.CSSProperties = { padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
+const FOOTER_STYLE: React.CSSProperties = { borderTop: '1px solid var(--border-color)', paddingTop: '20px', textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-tertiary)', letterSpacing: '0.02em' };
+const LOADING_STYLE: React.CSSProperties = { minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px' };
+const PHASE_GRID_STYLE: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' };
+
 // ─── Toast Component ──────────────────────────────────────────────────────────
 const Toast = ({ msg, type, onDismiss }: { msg: string; type: 'error' | 'success'; onDismiss: () => void }) => (
   <div style={{
@@ -93,7 +104,7 @@ const Toast = ({ msg, type, onDismiss }: { msg: string; type: 'error' | 'success
     animation: 'slideUp 0.25s ease-out',
   }}>
     <span style={{ flex: 1 }}>{msg}</span>
-    <button onClick={onDismiss} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}>✕</button>
+    <button onClick={onDismiss} aria-label="Dismiss notification" style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}>✕</button>
   </div>
 );
 
@@ -345,12 +356,12 @@ function App() {
         body: JSON.stringify({ itemId, completed, quantity })
       });
       if (!res.ok) {
-        // Rollback optimistic update on failure
-        setPlan({ ...plan });
+        // Rollback: use functional updater to avoid stale closure
+        setPlan(prev => prev ? { ...prev, checklist: prev.checklist } : prev);
         showToast('Failed to save checklist update.', 'error');
       }
     } catch {
-      setPlan({ ...plan });
+      setPlan(prev => prev ? { ...prev } : prev);
       showToast('Network error while syncing checklist.', 'error');
     }
   }, [plan, showToast]);
@@ -360,18 +371,7 @@ function App() {
   const checklistDone = plan?.checklist.filter(x => x.completed).length ?? 0;
   const completionPct = checklistTotal > 0 ? Math.round((checklistDone / checklistTotal) * 100) : 0;
 
-  // ─── Loading Splash ─────────────────────────────────────────────────────────
-  if (initialLoading) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
-        <CloudRain size={36} style={{ color: 'var(--accent-color)' }} />
-        <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-primary)' }}>Loading RainReady...</div>
-        <div className="spinner" />
-      </div>
-    );
-  }
-
-  // ─── Memoized Instructions grouping for maximum render efficiency ────────
+  // ─── Memoized Instructions grouping — must be ABOVE any early return ─────
   const groupedInstructions = useMemo(() => {
     if (!plan) return { before: [], during: [], after: [] };
     return {
@@ -381,16 +381,27 @@ function App() {
     };
   }, [plan]);
 
+  // ─── Loading Splash ─────────────────────────────────────────────────────────
+  if (initialLoading) {
+    return (
+      <div style={LOADING_STYLE}>
+        <CloudRain size={36} style={{ color: 'var(--accent-color)' }} />
+        <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-primary)' }}>Loading RainReady...</div>
+        <div className="spinner" />
+      </div>
+    );
+  }
+
   // ─── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '30px 20px', display: 'flex', flexDirection: 'column', gap: '30px', minHeight: '100vh' }}>
+    <div style={LAYOUT_STYLE}>
 
       {/* Toast Notification */}
       {toast && <Toast msg={toast.msg} type={toast.type} onDismiss={() => setToast(null)} />}
 
       {/* ─── Header ─────────────────────────────────────────────────────────── */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <header style={HEADER_STYLE}>
+        <div style={BRAND_WRAP_STYLE}>
           <CloudRain size={28} style={{ color: 'var(--accent-color)' }} aria-hidden="true" />
           <div>
             <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
@@ -520,7 +531,7 @@ function App() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', animation: 'fadeIn 0.2s ease-out' }}>
 
             {/* Stats Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+            <div style={STATS_GRID_STYLE}>
               <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.04em' }}>MONSOON RISK LEVEL</div>
@@ -599,15 +610,25 @@ function App() {
                   <AlertTriangle size={15} /> Severe Weather Warning for {plan.location}
                 </h4>
                 {alerts.map((alert) => (
-                  <div key={alert._id} style={{ fontSize: '0.84rem', color: 'var(--text-primary)', paddingLeft: '21px' }}>
-                    <strong>{alert.title}</strong>: {alert.message}
+                  <div key={alert._id} style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '21px', borderLeft: `3px solid ${alert.severity === 'critical' ? 'var(--error-color)' : 'var(--warning-color)'}`, paddingBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem', color: 'var(--text-primary)' }}>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2px 6px', borderRadius: '4px', background: alert.severity === 'critical' ? 'rgba(244,63,94,0.12)' : alert.severity === 'warning' ? 'rgba(245,158,11,0.12)' : 'rgba(16,185,129,0.12)', color: alert.severity === 'critical' ? 'var(--error-color)' : alert.severity === 'warning' ? 'var(--warning-color)' : 'var(--accent-color)', flexShrink: 0 }}>{alert.severity}</span>
+                      <strong>{alert.title}</strong>: {alert.message}
+                    </div>
+                    {alert.recommendations && alert.recommendations.length > 0 && (
+                      <ul style={{ margin: 0, paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        {alert.recommendations.map((rec: string, i: number) => (
+                          <li key={i} style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{rec}</li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 ))}
               </div>
             )}
 
             {/* Tabs */}
-            <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid var(--border-color)' }}>
+            <div role="tablist" aria-label="Dashboard sections" style={{ display: 'flex', gap: '0', borderBottom: '1px solid var(--border-color)' }}>
               {(['instructions', 'checklist', 'travel', 'chat'] as const).map(tab => {
                 const labelMap = {
                   instructions: 'Safety Manual',
@@ -619,6 +640,10 @@ function App() {
                 return (
                   <button
                     key={tab}
+                    role="tab"
+                    aria-selected={active}
+                    aria-controls={`tabpanel-${tab}`}
+                    id={`tab-${tab}`}
                     onClick={() => setActiveTab(tab)}
                     style={{
                       background: 'none',
@@ -642,7 +667,7 @@ function App() {
             {/* Tab Panels */}
             <div style={{ minHeight: '350px' }}>
               {activeTab === 'instructions' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+                <div role="tabpanel" id="tabpanel-instructions" aria-labelledby="tab-instructions" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
                   {(['before', 'during', 'after'] as const).map(phase => {
                     const instructions = groupedInstructions[phase];
                     const phaseTitle = { before: 'Before Severe Weather', during: 'During Storm / Flood', after: 'After Severe Weather' }[phase];
@@ -668,6 +693,56 @@ function App() {
                       </div>
                     );
                   })}
+
+                  {/* Community Preparedness — spans full width below phase cards */}
+                  <div
+                    className="glass-card"
+                    style={{
+                      gridColumn: '1 / -1',
+                      background: 'rgba(16, 185, 129, 0.03)',
+                      border: '1px solid rgba(16, 185, 129, 0.18)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                    }}
+                  >
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-color)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      🏘 Community Preparedness
+                    </h3>
+                    <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
+                      RainReady plans include community-level actions generated by Gemini AI — steps your household can
+                      take <em>with</em> or <em>for</em> neighbours. Look for community actions tagged in the safety
+                      instructions above (e.g. checking on elderly neighbours, coordinating evacuation routes, sharing
+                      surplus supplies with nearby households).
+                    </p>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      {[
+                        { icon: '👴', label: 'Check on elderly neighbours before a storm' },
+                        { icon: '🛖', label: 'Share surplus water & dry food with households in need' },
+                        { icon: '📢', label: 'Relay official alerts to neighbours without smartphones' },
+                        { icon: '🚗', label: 'Coordinate shared evacuation vehicles for your street' },
+                      ].map(tip => (
+                        <div
+                          key={tip.label}
+                          style={{
+                            flex: '1 1 200px',
+                            background: 'var(--bg-secondary)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '8px',
+                            padding: '10px 12px',
+                            fontSize: '0.78rem',
+                            color: 'var(--text-secondary)',
+                            display: 'flex',
+                            gap: '8px',
+                            alignItems: 'flex-start',
+                          }}
+                        >
+                          <span style={{ fontSize: '1rem', flexShrink: 0 }}>{tip.icon}</span>
+                          <span>{tip.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -684,13 +759,46 @@ function App() {
 
               {activeTab === 'travel' && (
                 <div style={{ maxWidth: '680px', margin: '0 auto' }}>
-                  <TravelAdvisor />
+                  <TravelAdvisor defaultOrigin={plan.location} />
                 </div>
               )}
 
               {activeTab === 'chat' && (
-                <div style={{ maxWidth: '680px', margin: '0 auto' }}>
-                  <MultilingualChat />
+                <div style={{ maxWidth: '680px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Emergency SOS Contacts — always visible in chat tab as a safety anchor */}
+                  <div className="glass-card" style={{ padding: '14px 18px', background: 'rgba(244, 63, 94, 0.03)', border: '1px solid rgba(244, 63, 94, 0.15)' }}>
+                    <h4 style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--error-color)', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                      🆘 EMERGENCY CONTACTS — INDIA
+                    </h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
+                      {[
+                        { name: 'National Emergency', number: '112', desc: 'Police / Fire / Ambulance' },
+                        { name: 'NDRF Helpline', number: '011-24363260', desc: 'Flood & Disaster Rescue' },
+                        { name: 'Disaster Mgmt', number: '1078', desc: 'National Control Room' },
+                        { name: 'Health Helpline', number: '104', desc: 'Medical emergencies' },
+                      ].map(contact => (
+                        <a
+                          key={contact.number}
+                          href={`tel:${contact.number.replace(/\D/g, '')}`}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '2px',
+                            background: 'var(--bg-secondary)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '8px',
+                            padding: '10px 12px',
+                            textDecoration: 'none',
+                          }}
+                        >
+                          <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--error-color)', letterSpacing: '0.02em' }}>{contact.number}</span>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-primary)' }}>{contact.name}</span>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>{contact.desc}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                  <MultilingualChat defaultLanguage={plan.language} />
                 </div>
               )}
             </div>

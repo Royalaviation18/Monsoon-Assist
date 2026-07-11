@@ -186,11 +186,19 @@ router.get('/alerts/:location', async (req: Request, res: Response): Promise<voi
     }
 
     const safeLocation = escapeRegex(location.trim());
-    const alerts = await SafetyAlert.find({
+    const dbAlerts = await SafetyAlert.find({
       location: new RegExp(safeLocation, 'i')
     }).sort({ createdAt: -1 }).limit(10).select('-__v');
 
-    res.json(alerts);
+    // If no DB alerts exist for this city, fall back to an AI-generated alert
+    // so every location always gets relevant, real-time monsoon guidance.
+    if (dbAlerts.length === 0) {
+      const aiAlert = await AIService.generateLocationAlert(location.trim());
+      res.json([{ _id: 'ai-generated', location: location.trim(), createdAt: new Date().toISOString(), ...aiAlert }]);
+      return;
+    }
+
+    res.json(dbAlerts);
   } catch (err) {
     console.error('[RainReady] Alerts fetch error:', err);
     res.status(500).json({ error: 'Failed to retrieve safety alerts.' });

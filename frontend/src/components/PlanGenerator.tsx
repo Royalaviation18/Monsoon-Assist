@@ -3,10 +3,25 @@ import { ShieldAlert, Home, ChevronRight, MapPin } from 'lucide-react';
 
 const LANGUAGES = ['English', 'Hindi', 'Bengali', 'Tamil', 'Telugu', 'Marathi'];
 
+interface HouseholdMember {
+  name: string;
+  age: number;
+  gender: string;
+  vulnerabilities: string[];
+}
 
+interface PlanFormData {
+  profileName: string;
+  location: string;
+  householdSize: number;
+  buildingType: 'ground_floor' | 'high_rise' | 'independent';
+  vulnerabilities: string[];
+  members: HouseholdMember[];
+  language: string;
+}
 
 interface PlanGeneratorProps {
-  onSubmit: (data: any) => void;
+  onSubmit: (data: PlanFormData) => void;
   loading: boolean;
 }
 
@@ -19,7 +34,7 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
   const [localWeather, setLocalWeather] = useState<{ temp: number; condition: string } | null>(null);
 
   // Dynamic Family Members List
-  const [members, setMembers] = useState<Array<{ name: string; age: number; gender: string; vulnerabilities: string[] }>>([
+  const [members, setMembers] = useState<HouseholdMember[]>([
     { name: 'Self', age: 28, gender: 'Male', vulnerabilities: [] }
   ]);
 
@@ -28,6 +43,7 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
   const [mAge, setMAge] = useState('30');
   const [mGender, setMGender] = useState('Male');
   const [mVuln, setMVuln] = useState<string[]>([]);
+  const [memberError, setMemberError] = useState<string | null>(null);
 
   const handleAgeChange = (val: string) => {
     // Strips any non-digit character (blocking -, ., e, etc.)
@@ -63,41 +79,52 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
     fetchGeoLocation();
   }, []);
 
-  // Fetch local weather when location changes
+  // Fetch local weather when location changes — debounced + AbortController to prevent memory leaks
   useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
+
     const fetchLocalWeather = async () => {
       const key = location.trim();
       if (key.length < 2) return;
-      
+
       try {
-        const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(key)}&count=1&format=json`);
-        if (geoRes.ok) {
-          const geoData = await geoRes.json();
-          if (geoData.results && geoData.results.length > 0) {
-            const { latitude, longitude } = geoData.results[0];
-            const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
-            if (res.ok) {
-              const data = await res.json();
-              const cur = data.current_weather;
-              setLocalWeather({
-                temp: cur.temperature,
-                condition: cur.weathercode >= 51 ? 'Heavy Rain' : 'Light Drizzle / Cloudy'
-              });
-              return;
-            }
+        const geoRes = await fetch(
+          `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(key)}&count=1&format=json`,
+          { signal }
+        );
+        if (!geoRes.ok) return;
+        const geoData = await geoRes.json();
+        if (geoData.results && geoData.results.length > 0) {
+          const { latitude, longitude } = geoData.results[0];
+          const res = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`,
+            { signal }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            const cur = data.current_weather;
+            setLocalWeather({
+              temp: cur.temperature,
+              condition: cur.weathercode >= 51 ? 'Heavy Rain' : 'Light Drizzle / Cloudy',
+            });
+            return;
           }
         }
-
-        // Default Fallback
         setLocalWeather({ temp: 28, condition: 'Cloudy' });
-      } catch (err) {
-        console.warn('Home page weather fetch failed:', err);
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name !== 'AbortError') {
+          console.warn('Home page weather fetch failed:', err);
+        }
       }
     };
 
-    // Debounce the typing action by 500ms
+    // Debounce by 500ms; cancel pending fetch on cleanup
     const timer = setTimeout(fetchLocalWeather, 500);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [location]);
 
   const addMember = () => {
@@ -136,9 +163,10 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
     }
 
     if (members.length === 0) {
-      alert("Please add at least one household member.");
+      setMemberError('Please add at least one household member before generating a plan.');
       return;
     }
+    setMemberError(null);
 
     onSubmit({
       profileName: trimmedProfileName,
@@ -159,7 +187,7 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
           Get Preparedness Plan
         </h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-          Configure household details to let Generative AI structure safety instructions and custom survival supplies.
+          Enter your household details — Gemini AI will generate a personalised monsoon safety plan with before, during, and after storm instructions tailored to your location, building type, and family members.
         </p>
       </div>
 
@@ -439,6 +467,20 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
           ))}
         </div>
       </div>
+
+      {memberError && (
+        <div style={{
+          background: 'rgba(244, 63, 94, 0.06)',
+          border: '1px solid rgba(244, 63, 94, 0.25)',
+          color: 'var(--error-color)',
+          padding: '10px 14px',
+          borderRadius: '8px',
+          fontSize: '0.84rem',
+          fontWeight: 500,
+        }}>
+          ⚠ {memberError}
+        </div>
+      )}
 
       <button
         type="submit"
