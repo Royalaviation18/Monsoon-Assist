@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PlanGenerator } from './components/PlanGenerator';
 import { EmergencyChecklist } from './components/EmergencyChecklist';
 import { TravelAdvisor } from './components/TravelAdvisor';
@@ -160,6 +160,19 @@ function App() {
   // ─── Fetch Weather ──────────────────────────────────────────────────────────
   const fetchWeather = useCallback(async (locStr: string) => {
     if (!locStr || locStr.trim().length < 2) return;
+    const cleanLoc = locStr.trim().toLowerCase();
+    
+    // Check cache to avoid hitting Open-Meteo API repeatedly
+    const cachedWeather = sessionStorage.getItem(`weather_${cleanLoc}`);
+    if (cachedWeather) {
+      try {
+        setWeather(JSON.parse(cachedWeather));
+        return;
+      } catch {
+        // Fall through on JSON parse error
+      }
+    }
+
     try {
       const geoRes = await fetch(
         `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locStr.trim())}&count=1&format=json`
@@ -175,11 +188,13 @@ function App() {
         if (!res.ok) return;
         const data = await res.json();
         const cur = data.current_weather;
-        setWeather({
+        const mappedWeather = {
           temp: cur.temperature,
           windspeed: cur.windspeed,
           condition: getWeatherCondition(cur.weathercode),
-        });
+        };
+        setWeather(mappedWeather);
+        sessionStorage.setItem(`weather_${cleanLoc}`, JSON.stringify(mappedWeather));
       }
     } catch {
       // Weather is non-critical — silently fail
@@ -355,6 +370,16 @@ function App() {
       </div>
     );
   }
+
+  // ─── Memoized Instructions grouping for maximum render efficiency ────────
+  const groupedInstructions = useMemo(() => {
+    if (!plan) return { before: [], during: [], after: [] };
+    return {
+      before: plan.safetyInstructions.filter(i => i.phase === 'before'),
+      during: plan.safetyInstructions.filter(i => i.phase === 'during'),
+      after: plan.safetyInstructions.filter(i => i.phase === 'after'),
+    };
+  }, [plan]);
 
   // ─── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -619,7 +644,7 @@ function App() {
               {activeTab === 'instructions' && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
                   {(['before', 'during', 'after'] as const).map(phase => {
-                    const instructions = plan.safetyInstructions.filter(i => i.phase === phase);
+                    const instructions = groupedInstructions[phase];
                     const phaseTitle = { before: 'Before Severe Weather', during: 'During Storm / Flood', after: 'After Severe Weather' }[phase];
                     const phaseColor = { before: 'var(--success-color)', during: 'var(--warning-color)', after: 'var(--text-secondary)' }[phase];
                     return (
@@ -645,6 +670,8 @@ function App() {
                   })}
                 </div>
               )}
+
+
 
               {activeTab === 'checklist' && (
                 <div style={{ maxWidth: '680px', margin: '0 auto' }}>
