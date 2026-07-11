@@ -27,16 +27,7 @@ interface PreparednessPlan {
   createdAt: string;
 }
 
-const CITY_COORDS: Record<string, { lat: number; lon: number }> = {
-  mumbai: { lat: 19.0760, lon: 72.8777 },
-  pune: { lat: 18.5204, lon: 73.8567 },
-  bengaluru: { lat: 12.9716, lon: 77.5946 },
-  bangalore: { lat: 12.9716, lon: 77.5946 },
-  delhi: { lat: 28.7041, lon: 77.1025 },
-  kolkata: { lat: 22.5726, lon: 88.3639 },
-  chennai: { lat: 13.0827, lon: 80.2707 },
-  kerala: { lat: 10.8505, lon: 76.2711 }
-};
+
 
 function App() {
   const [view, setView] = useState<'setup' | 'dashboard'>('setup');
@@ -132,17 +123,28 @@ function App() {
   };
 
   const fetchWeather = async (locStr: string) => {
-    const key = locStr.toLowerCase().trim();
-    let coords = CITY_COORDS[key];
-    
-    // Fallback search
-    if (!coords) {
-      const matchingKey = Object.keys(CITY_COORDS).find(k => key.includes(k));
-      coords = matchingKey ? CITY_COORDS[matchingKey] : CITY_COORDS['mumbai'];
-    }
-
     try {
-      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current_weather=true`);
+      const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locStr)}&count=1&format=json`);
+      if (geoRes.ok) {
+        const geoData = await geoRes.json();
+        if (geoData.results && geoData.results.length > 0) {
+          const { latitude, longitude } = geoData.results[0];
+          const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
+          if (res.ok) {
+            const data = await res.json();
+            const cur = data.current_weather;
+            setWeather({
+              temp: cur.temperature,
+              windspeed: cur.windspeed,
+              condition: cur.weathercode >= 51 ? 'Heavy Rain' : 'Light Drizzle / Cloudy'
+            });
+            return;
+          }
+        }
+      }
+      
+      // Fallback if geocoding fails
+      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=19.0760&longitude=72.8777&current_weather=true`);
       if (res.ok) {
         const data = await res.json();
         const cur = data.current_weather;
