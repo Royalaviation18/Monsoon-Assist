@@ -288,7 +288,16 @@ function App() {
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
         
         {view === 'setup' && (
-          <div style={{ maxWidth: '640px', margin: '30px auto', width: '100%', animation: 'slideUp 0.3s ease-out' }}>
+          <div style={{ maxWidth: '640px', margin: '30px auto', width: '100%', animation: 'slideUp 0.3s ease-out', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {plans.length > 0 && (
+              <button
+                onClick={() => setView('dashboard')}
+                className="btn-secondary"
+                style={{ alignSelf: 'flex-start', padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <ArrowLeft size={14} /> Back to Dashboard
+              </button>
+            )}
             <PlanGenerator onSubmit={handleCreatePlan} loading={loading} />
           </div>
         )}
