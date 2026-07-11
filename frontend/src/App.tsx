@@ -38,18 +38,8 @@ function App() {
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const [activeTab, setActiveTab] = useState<'instructions' | 'checklist' | 'travel' | 'chat'>('instructions');
   
-  // Theme & Weather States
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  // Weather State
   const [weather, setWeather] = useState<{ temp: number; windspeed: number; condition: string } | null>(null);
-
-  // Toggle Theme class
-  useEffect(() => {
-    if (theme === 'light') {
-      document.documentElement.classList.add('light-theme');
-    } else {
-      document.documentElement.classList.remove('light-theme');
-    }
-  }, [theme]);
 
   // Verify health status, connection, and fetch existing plans
   useEffect(() => {
@@ -297,25 +287,7 @@ function App() {
             + Add Household
           </button>
 
-          {/* Theme switcher */}
-          <button
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            style={{
-              background: 'var(--bg-secondary)',
-              border: '1px solid var(--border-color)',
-              color: 'var(--text-secondary)',
-              padding: '6px 12px',
-              borderRadius: '20px',
-              cursor: 'pointer',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            {theme === 'dark' ? '☀ Light Mode' : '🌙 Dark Mode'}
-          </button>
+
           
           {/* Database Health Badge */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-secondary)', padding: '6px 12px', borderRadius: '20px', border: '1px solid var(--border-color)' }}>
