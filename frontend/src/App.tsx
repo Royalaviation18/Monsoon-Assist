@@ -350,12 +350,30 @@ function App() {
               </div>
             </div>
 
-            {/* Back Button */}
-            <div>
-              <button onClick={() => setView('setup')} className="btn-secondary">
-                <ArrowLeft size={14} /> Back to Config Profile
-              </button>
-            </div>
+            {/* Active Family Members Directory (Read-only on Dashboard) */}
+            {plan.members && plan.members.length > 0 && (
+              <div className="glass-card" style={{ padding: '16px' }}>
+                <h4 style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-tertiary)', marginBottom: '10px', letterSpacing: '0.05em' }}>
+                  MEMBERS REGISTERED IN THIS HOUSEHOLD
+                </h4>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  {plan.members.map((m: any, idx: number) => (
+                    <div key={idx} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '8px 12px', fontSize: '0.8rem' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{m.name}</span> ({m.gender}, {m.age} yrs)
+                      {m.vulnerabilities?.length > 0 && (
+                        <div style={{ display: 'inline-flex', gap: '4px', marginLeft: '8px' }}>
+                          {m.vulnerabilities.map((v: string) => (
+                            <span key={v} style={{ fontSize: '0.65rem', background: 'rgba(244, 63, 94, 0.1)', color: 'var(--error-color)', padding: '1px 4px', borderRadius: '4px' }}>
+                              {v === 'mobility' ? 'Mobility' : v === 'infant' ? 'Infant' : v === 'medical' ? 'Medical' : v}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Active alerts display */}
             {alerts.length > 0 && (
