@@ -187,10 +187,11 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
         {/* Profile Name */}
         <div>
-          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+          <label htmlFor="profileNameInput" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
             HOUSEHOLD PROFILE NAME
           </label>
           <input
+            id="profileNameInput"
             type="text"
             value={profileName}
             onChange={(e) => setProfileName(e.target.value)}
@@ -201,12 +202,13 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
 
         {/* Location */}
         <div>
-          <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+          <label htmlFor="locationInput" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
             <span>LOCATION / CITY</span>
             {detecting && <span style={{ fontSize: '0.75rem', color: 'var(--accent-color)', fontWeight: 500 }}>Detecting...</span>}
           </label>
           <div style={{ position: 'relative' }}>
             <input
+              id="locationInput"
               type="text"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
@@ -330,8 +332,9 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
         <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)' }}>ADD FAMILY MEMBER</h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>NAME</label>
+            <label htmlFor="mNameInput" style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>NAME</label>
             <input
+              id="mNameInput"
               type="text"
               value={mName}
               onChange={(e) => setMName(e.target.value)}
@@ -340,8 +343,9 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
             />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>AGE</label>
+            <label htmlFor="mAgeInput" style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>AGE</label>
             <input
+              id="mAgeInput"
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
@@ -352,8 +356,9 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
             />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>GENDER</label>
+            <label htmlFor="mGenderSelect" style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>GENDER</label>
             <select
+              id="mGenderSelect"
               value={mGender}
               onChange={(e) => setMGender(e.target.value)}
               style={{ padding: '8px 10px', fontSize: '0.85rem' }}

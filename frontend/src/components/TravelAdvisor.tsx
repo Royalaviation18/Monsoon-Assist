@@ -56,10 +56,11 @@ export const TravelAdvisor: React.FC = () => {
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+            <label htmlFor="originCityInput" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
               ORIGIN CITY
             </label>
             <input
+              id="originCityInput"
               type="text"
               value={origin}
               onChange={(e) => setOrigin(e.target.value)}
@@ -68,10 +69,11 @@ export const TravelAdvisor: React.FC = () => {
             />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+            <label htmlFor="destinationCityInput" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
               DESTINATION CITY
             </label>
             <input
+              id="destinationCityInput"
               type="text"
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
@@ -82,10 +84,10 @@ export const TravelAdvisor: React.FC = () => {
         </div>
 
         <div>
-          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+          <label htmlFor="travelModeSelect" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
             MODE OF TRAVEL
           </label>
-          <select value={mode} onChange={(e) => setMode(e.target.value)}>
+          <select id="travelModeSelect" value={mode} onChange={(e) => setMode(e.target.value)}>
             <option value="driving">Driving / Car</option>
             <option value="two_wheeler">Two-Wheeler (Motorcycle/Scooter)</option>
             <option value="train">Train</option>

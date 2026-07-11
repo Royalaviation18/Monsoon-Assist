@@ -149,6 +149,7 @@ export const MultilingualChat: React.FC = () => {
           placeholder={`Ask safety questions in ${language}...`}
           style={{ flex: 1 }}
           required
+          aria-label={`Ask safety questions in ${language}`}
         />
         <button
           type="submit"

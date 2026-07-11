@@ -382,8 +382,9 @@ function App() {
           {/* Household Selector */}
           {plans.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>ACTIVE HOUSEHOLD:</span>
+              <label htmlFor="activeHouseholdSelect" style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>ACTIVE HOUSEHOLD:</label>
               <select
+                id="activeHouseholdSelect"
                 value={plan?._id || ''}
                 onChange={e => handleSelectPlan(e.target.value)}
                 style={{
