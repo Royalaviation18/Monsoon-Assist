@@ -5,6 +5,7 @@ import { TravelAdvisor } from './components/TravelAdvisor';
 import { MultilingualChat } from './components/MultilingualChat';
 import { Compass, AlertTriangle, ShieldCheck, Database, CloudRain, ArrowLeft, Trash2, PlusCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { apiFetch } from './api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -189,7 +190,7 @@ function App() {
   const fetchAlerts = useCallback(async (location: string) => {
     if (!location?.trim()) return;
     try {
-      const res = await fetch(`/api/monsoon/alerts/${encodeURIComponent(location)}`);
+      const res = await apiFetch(`/api/monsoon/alerts/${encodeURIComponent(location)}`);
       if (res.ok) {
         const data: SafetyAlert[] = await res.json();
         setAlerts(data);
@@ -202,7 +203,7 @@ function App() {
   // ─── Health Check ───────────────────────────────────────────────────────────
   const checkHealth = useCallback(async () => {
     try {
-      const res = await fetch('/api/health');
+      const res = await apiFetch('/api/health');
       if (res.ok) {
         const data = await res.json();
         setDbStatus(data.database === 'connected' ? 'connected' : 'disconnected');
@@ -217,7 +218,7 @@ function App() {
   // ─── Load Plans ─────────────────────────────────────────────────────────────
   const fetchPlans = useCallback(async () => {
     try {
-      const res = await fetch('/api/monsoon/plans');
+      const res = await apiFetch('/api/monsoon/plans');
       if (res.ok) {
         const data: PreparednessPlan[] = await res.json();
         setPlans(data);
@@ -257,7 +258,7 @@ function App() {
     if (!plan) return;
     setShowDeleteConfirm(false);
     try {
-      const res = await fetch(`/api/monsoon/plan/${plan._id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/monsoon/plan/${plan._id}`, { method: 'DELETE' });
       if (res.ok) {
         const updated = plans.filter(p => p._id !== plan._id);
         setPlans(updated);
@@ -285,7 +286,7 @@ function App() {
   const handleCreatePlan = useCallback(async (formData: any) => {
     setLoading(true);
     try {
-      const res = await fetch('/api/monsoon/plan', {
+      const res = await apiFetch('/api/monsoon/plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -323,7 +324,7 @@ function App() {
     setPlan({ ...plan, checklist: updatedChecklist });
 
     try {
-      const res = await fetch(`/api/monsoon/plan/${plan._id}/checklist`, {
+      const res = await apiFetch(`/api/monsoon/plan/${plan._id}/checklist`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ itemId, completed, quantity })

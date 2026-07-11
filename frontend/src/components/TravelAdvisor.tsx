@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Compass, CheckCircle, Navigation } from 'lucide-react';
+import { apiFetch } from '../api';
 
 export const TravelAdvisor: React.FC = () => {
   const [origin, setOrigin] = useState('Mumbai');
@@ -15,7 +16,7 @@ export const TravelAdvisor: React.FC = () => {
     setError(null);
     setAssessment(null);
     try {
-      const res = await fetch('/api/monsoon/travel', {
+      const res = await apiFetch('/api/monsoon/travel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ origin, destination, mode })

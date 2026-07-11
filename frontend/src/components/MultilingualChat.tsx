@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, MessageSquare, ShieldAlert } from 'lucide-react';
+import { apiFetch } from '../api';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -31,7 +32,7 @@ export const MultilingualChat: React.FC = () => {
     setError(null);
 
     try {
-      const res = await fetch('/api/monsoon/chat', {
+      const res = await apiFetch('/api/monsoon/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: input, history: messages, language })
