@@ -22,9 +22,14 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
 
   // Member Input States
   const [mName, setMName] = useState('');
-  const [mAge, setMAge] = useState(30);
+  const [mAge, setMAge] = useState('30');
   const [mGender, setMGender] = useState('Male');
   const [mVuln, setMVuln] = useState<string[]>([]);
+
+  const handleAgeChange = (val: string) => {
+    // Strips any non-digit character (blocking -, ., e, etc.)
+    setMAge(val.replace(/\D/g, ''));
+  };
 
   // Auto-detect location on load
   useEffect(() => {
@@ -49,14 +54,16 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
 
   const addMember = () => {
     if (!mName.trim()) return;
+    const parsedAge = parseInt(mAge, 10);
+    const finalAge = isNaN(parsedAge) ? 0 : Math.max(0, parsedAge);
     setMembers(prev => [...prev, {
       name: mName.trim(),
-      age: mAge,
+      age: finalAge,
       gender: mGender,
       vulnerabilities: mVuln
     }]);
     setMName('');
-    setMAge(30);
+    setMAge('30');
     setMGender('Male');
     setMVuln([]);
   };
@@ -254,9 +261,12 @@ export const PlanGenerator: React.FC<PlanGeneratorProps> = ({ onSubmit, loading 
           <div>
             <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>AGE</label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={mAge}
-              onChange={(e) => setMAge(Number(e.target.value))}
+              onChange={(e) => handleAgeChange(e.target.value)}
+              placeholder="0"
               style={{ padding: '8px 10px', fontSize: '0.85rem' }}
             />
           </div>
