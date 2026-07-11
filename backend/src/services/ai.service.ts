@@ -69,7 +69,7 @@ export class AIService {
     }
 
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
       const prompt = `
 You are a senior crisis management and disaster safety expert specialized in Indian monsoon hazards (floods, waterlogging, high winds, landslides, structural failures, and vector-borne diseases).
 
@@ -141,7 +141,7 @@ Ensure the instructions and checklist are fully translated into ${language} if r
     }
 
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
       const prompt = `
 Analyze the safety of traveling from "${origin}" to "${destination}" via "${mode}" during a heavy rain/monsoon season.
 Assess potential waterlogging, landslide hazards, visibility, and road blockages typical for this route.
@@ -187,7 +187,7 @@ Provide a single, valid JSON object (no code blocks, no markdown backticks):
     }
 
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
       
       const chatHistory = history.map(h => ({
         role: h.role,
