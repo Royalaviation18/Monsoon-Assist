@@ -667,7 +667,7 @@ function App() {
             {/* Tab Panels */}
             <div style={{ minHeight: '350px' }}>
               {activeTab === 'instructions' && (
-                <div role="tabpanel" id="tabpanel-instructions" aria-labelledby="tab-instructions" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+                <div role="tabpanel" id="tabpanel-instructions" aria-labelledby="tab-instructions" style={PHASE_GRID_STYLE}>
                   {(['before', 'during', 'after'] as const).map(phase => {
                     const instructions = groupedInstructions[phase];
                     const phaseTitle = { before: 'Before Severe Weather', during: 'During Storm / Flood', after: 'After Severe Weather' }[phase];
